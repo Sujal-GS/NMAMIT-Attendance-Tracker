@@ -105,6 +105,16 @@ const App = {
     if (window.Simulator) Simulator.init();
     if (window.Wrapped) Wrapped.init();
 
+    // Check PWA installation state to hide Install card if already installed
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches 
+      || window.navigator.standalone === true 
+      || document.referrer.includes('android-app://')
+      || localStorage.getItem('att_pwa_installed') === 'true';
+
+    if (isStandalone) {
+      this.hideInstallPrompts();
+    }
+
     // Initial render: Load active tabs immediately
     CalendarView.render();
     SummaryView.load();
@@ -421,6 +431,8 @@ const App = {
             await this.deferredPrompt.prompt();
             const choice = await this.deferredPrompt.userChoice;
             if (choice && choice.outcome === 'accepted') {
+              localStorage.setItem('att_pwa_installed', 'true');
+              this.hideInstallPrompts();
               this.showToast('NMAMIT Attendance installed! 🚀', 'success');
               this.closePwaModal();
             }
@@ -500,19 +512,51 @@ const App = {
       });
     }
 
+    // Check if app is running in standalone PWA mode or previously installed
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches 
+      || window.navigator.standalone === true 
+      || document.referrer.includes('android-app://')
+      || localStorage.getItem('att_pwa_installed') === 'true';
+
+    if (isStandalone) {
+      this.hideInstallPrompts();
+    }
+
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       this.deferredPrompt = e;
-      const installBtn = document.getElementById('btn-pwa-install');
-      if (installBtn) installBtn.classList.remove('hidden');
+      if (!isStandalone) {
+        const installBtn = document.getElementById('btn-pwa-install');
+        const spotlightPwaCard = document.getElementById('spotlight-pwa-card');
+        if (installBtn) installBtn.classList.remove('hidden');
+        if (spotlightPwaCard) {
+          spotlightPwaCard.classList.remove('hidden');
+          spotlightPwaCard.style.display = '';
+        }
+      }
     });
 
     window.addEventListener('appinstalled', () => {
       this.deferredPrompt = null;
-      const installBtn = document.getElementById('btn-pwa-install');
-      if (installBtn) installBtn.classList.add('hidden');
-      this.showToast('App installed to your device home screen!', 'success');
+      localStorage.setItem('att_pwa_installed', 'true');
+      this.hideInstallPrompts();
+      this.showToast('App installed to your device home screen! 🚀', 'success');
     });
+  },
+
+  hideInstallPrompts() {
+    const installBtn = document.getElementById('btn-pwa-install');
+    const spotlightPwaCard = document.getElementById('spotlight-pwa-card');
+    const spotlightBar = document.querySelector('.feature-spotlight-bar');
+
+    if (installBtn) installBtn.classList.add('hidden');
+    if (spotlightPwaCard) {
+      spotlightPwaCard.classList.add('hidden');
+      spotlightPwaCard.style.display = 'none';
+    }
+    if (spotlightBar) {
+      spotlightBar.classList.add('single-item');
+    }
   },
 
   initNetworkStatus() {
