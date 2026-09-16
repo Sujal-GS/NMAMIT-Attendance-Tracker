@@ -3,16 +3,6 @@
  * Features 20-Week Heatmap, Streaks, Subject Filtering & Day Inspection
  */
 
-// ── HTML escaping to prevent XSS via server-supplied data ────────────────────────
-function escapeHtml(str) {
-  return String(str === null || str === undefined ? '' : str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;');
-}
-
 const HeatmapView = {
   isInitialized: false,
   selectedSubject: 'ALL',
@@ -95,7 +85,7 @@ const HeatmapView = {
             <div class="tooltip-subjects">
               ${dayInfo.classes.slice(0, 5).map(c => {
                 const isPres = (c.fpresent === '1' || c.attended > 0 || String(c.fpresent).toUpperCase() === 'P');
-                const subName = escapeHtml(c.fsubname || c.name || c.fsubcode || 'Academic Class');
+                const subName = c.fsubname || c.name || c.fsubcode || 'Academic Class';
                 return `<div class="tooltip-sub-item ${isPres ? 'attended' : 'missed'}">
                   <span class="sub-dot"></span>
                   <span class="sub-name" title="${subName}">${subName}</span>
@@ -182,9 +172,9 @@ const HeatmapView = {
       const currentYear = today.getFullYear();
       const currentMonth = today.getMonth() + 1; // 1-12
 
-      // Prioritize the recent semester months first (from current month backwards)
+      // Fetch the last 8 months of attendance (Feb to Sep, covers entire 32-week academic span)
       const monthsToFetch = [];
-      for (let i = 0; i < 8; i++) {
+      for (let i = 7; i >= 0; i--) {
         let m = currentMonth - i;
         let y = currentYear;
         if (m <= 0) {
@@ -194,31 +184,22 @@ const HeatmapView = {
         monthsToFetch.push({ year: y, month: m });
       }
 
+      const results = await Promise.all(
+        monthsToFetch.map(({ year, month }) => API.getMonthAttendance(year, month).catch(() => ({})))
+      );
+
       this.semesterData.clear();
-
-      // Fetch in pairs of months and render progressively as data arrives
-      for (let i = 0; i < monthsToFetch.length; i += 2) {
-        const chunk = monthsToFetch.slice(i, i + 2);
-        const chunkRes = await Promise.all(
-          chunk.map(({ year, month }) => API.getMonthAttendance(year, month).catch(() => ({})))
-        );
-
-        let hasNewData = false;
-        chunkRes.forEach(res => {
-          if (res && res.success && res.monthData) {
-            for (const [dateStr, info] of Object.entries(res.monthData)) {
-              this.semesterData.set(dateStr, info);
-              hasNewData = true;
-            }
+      results.forEach(res => {
+        if (res && res.success && res.monthData) {
+          for (const [dateStr, info] of Object.entries(res.monthData)) {
+            this.semesterData.set(dateStr, info);
           }
-        });
-
-        if (hasNewData) {
-          this.populateSubjectFilter();
-          this.calculateStreaks();
-          this.render();
         }
-      }
+      });
+
+      this.populateSubjectFilter();
+      this.calculateStreaks();
+      this.render();
     } catch (err) {
       console.warn('[HeatmapView] Error loading semester data:', err);
     }
@@ -244,8 +225,7 @@ const HeatmapView = {
 
     let optionsHtml = '<option value="ALL">All Subjects Combined</option>';
     for (const [code, name] of subjectsMap.entries()) {
-      const esc = escapeHtml;
-      optionsHtml += `<option value="${esc(code)}" ${this.selectedSubject === code ? 'selected' : ''}>${esc(code)} - ${esc(name)}</option>`;
+      optionsHtml += `<option value="${code}" ${this.selectedSubject === code ? 'selected' : ''}>${code} - ${name}</option>`;
     }
     filterSelect.innerHTML = optionsHtml;
     if (window.CustomSelect) window.CustomSelect.refresh(filterSelect);
@@ -344,291 +324,330 @@ const HeatmapView = {
     this.calculateStreaks();
     this.renderMetrics();
     this.renderGrid();
-    this.renderAnalyticsPanels();
-  },
-
-  // ── Analytics Panels Orchestrator ─────────────────────────────────────────
-  renderAnalyticsPanels() {
-    this.renderInsights();
-    this.renderDayOfWeekChart();
+    this.renderSmartInsights();
+    this.renderWeeklyPattern();
     this.renderMonthlyTrend();
     this.renderSubjectLeaderboard();
   },
 
-  // ── 1. Smart Insights Strip ────────────────────────────────────────────────
-  renderInsights() {
-    const todayStr = this.formatDate(new Date());
-
-    // Day-of-week buckets: 0=Mon … 5=Sat (skip Sun)
-    const dayNames = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-    const dowBuckets = Array.from({ length: 7 }, () => ({ conducted: 0, attended: 0 }));
-
-    // Subject buckets
-    const subjectMap = new Map(); // code -> { name, conducted, attended }
+  renderSmartInsights() {
+    const dayStats = {
+      1: { name: 'Monday', conducted: 0, attended: 0 },
+      2: { name: 'Tuesday', conducted: 0, attended: 0 },
+      3: { name: 'Wednesday', conducted: 0, attended: 0 },
+      4: { name: 'Thursday', conducted: 0, attended: 0 },
+      5: { name: 'Friday', conducted: 0, attended: 0 },
+      6: { name: 'Saturday', conducted: 0, attended: 0 }
+    };
 
     let totalConducted = 0;
-    let totalMissed = 0;
+    let totalAttended = 0;
 
     for (const [dateStr, info] of this.semesterData.entries()) {
-      if (dateStr > todayStr) continue;
-      const d = new Date(dateStr + 'T00:00:00');
-      const dotw = (d.getDay() + 6) % 7; // Mon=0 … Sun=6
-
-      const cond = info.conducted || 0;
-      const att  = info.attended  || 0;
-      if (cond > 0) {
-        totalConducted += cond;
-        totalMissed    += (cond - att);
-        dowBuckets[dotw].conducted += cond;
-        dowBuckets[dotw].attended  += att;
-      }
-
-      // Per-subject aggregation
-      if (Array.isArray(info.classes)) {
-        info.classes.forEach(c => {
-          const code = c.fsubcode || c.code || 'UNKNOWN';
-          const name = c.fsubname || c.name || code;
-          const cnt  = parseInt(c.fnoclass || 1, 10);
-          const pres = (c.fpresent === '1' || c.fpresent === 1 || String(c.fpresent).toUpperCase() === 'P');
-          if (!subjectMap.has(code)) subjectMap.set(code, { name, conducted: 0, attended: 0 });
-          const sb = subjectMap.get(code);
-          sb.conducted += cnt;
-          if (pres) sb.attended += cnt;
-        });
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const dayOfWeek = new Date(y, m - 1, d).getDay();
+      if (dayStats[dayOfWeek] && info.conducted > 0) {
+        dayStats[dayOfWeek].conducted += (info.conducted || 0);
+        dayStats[dayOfWeek].attended += (info.attended || 0);
+        totalConducted += (info.conducted || 0);
+        totalAttended += (info.attended || 0);
       }
     }
 
-    // Weakest day (min pct among days with ≥1 class)
-    let weakDay = '—', weakDayPct = '';
-    {
-      let minPct = Infinity;
-      dowBuckets.forEach((b, i) => {
-        if (b.conducted > 0) {
-          const pct = (b.attended / b.conducted) * 100;
-          if (pct < minPct) { minPct = pct; weakDay = dayNames[i]; weakDayPct = `${pct.toFixed(0)}% avg attendance`; }
+    // Weakest Day
+    let weakestDayName = '—';
+    let weakestDayPct = null;
+    let minPct = Infinity;
+
+    for (let day = 1; day <= 6; day++) {
+      const stat = dayStats[day];
+      if (stat.conducted > 0) {
+        const pct = Math.round((stat.attended / stat.conducted) * 100);
+        if (pct < minPct) {
+          minPct = pct;
+          weakestDayName = stat.name;
+          weakestDayPct = pct;
         }
+      }
+    }
+
+    const weakestValEl = document.getElementById('insight-weakest-day');
+    const weakestSubEl = document.getElementById('insight-weakest-day-sub');
+    if (weakestValEl) weakestValEl.textContent = weakestDayName;
+    if (weakestSubEl) weakestSubEl.textContent = weakestDayPct !== null ? `${weakestDayPct}% avg attendance` : 'No data recorded';
+
+    // Best Subject
+    let subjectsList = [];
+    if (window.SummaryView && Array.isArray(SummaryView.rawSubjects) && SummaryView.rawSubjects.length > 0) {
+      subjectsList = SummaryView.rawSubjects.map(s => {
+        const cond = parseInt(s.ftotalclass || s.conducted || 0, 10);
+        const att = parseInt(s.fpresentclass || s.attended || 0, 10);
+        const pct = cond > 0 ? (att / cond) * 100 : 0;
+        return {
+          code: s.fsubcode || s.code || '',
+          name: s.fsubname || s.name || s.fsubcode || '',
+          conducted: cond,
+          attended: att,
+          pct
+        };
       });
-      if (weakDay === '—') { weakDay = 'N/A'; weakDayPct = 'No data yet'; }
-    }
-
-    // Best subject (max pct with ≥5 classes conducted)
-    let bestSubName = '—', bestSubPct = '';
-    {
-      let maxPct = -1;
-      for (const [, sb] of subjectMap.entries()) {
-        if (sb.conducted >= 5) {
-          const pct = (sb.attended / sb.conducted) * 100;
-          if (pct > maxPct) { maxPct = pct; bestSubName = sb.name.length > 22 ? sb.name.substring(0, 20) + '…' : sb.name; bestSubPct = `${pct.toFixed(0)}% perfect attendance`; }
+    } else {
+      const subMap = new Map();
+      for (const info of this.semesterData.values()) {
+        if (Array.isArray(info.classes)) {
+          info.classes.forEach(c => {
+            const code = c.fsubcode || c.code;
+            const name = c.fsubname || c.name || code;
+            if (code) {
+              if (!subMap.has(code)) subMap.set(code, { code, name, conducted: 0, attended: 0 });
+              const entry = subMap.get(code);
+              const cnt = parseInt(c.fnoclass || 1, 10);
+              entry.conducted += cnt;
+              if (c.fpresent === '1' || c.attended > 0 || String(c.fpresent).toUpperCase() === 'P') {
+                entry.attended += cnt;
+              }
+            }
+          });
         }
       }
-      if (bestSubName === '—') { bestSubName = 'N/A'; bestSubPct = 'Need more data'; }
+      subjectsList = Array.from(subMap.values()).map(s => ({
+        ...s,
+        pct: s.conducted > 0 ? (s.attended / s.conducted) * 100 : 0
+      }));
     }
 
-    // Missed classes
-    const missedDisplay = totalMissed > 0 ? `${totalMissed} classes` : 'None!';
-    const missedPct = totalConducted > 0
-      ? `${((totalMissed / totalConducted) * 100).toFixed(1)}% of all classes skipped`
-      : 'No data yet';
+    let bestSubName = '—';
+    let bestSubPct = 0;
+    if (subjectsList.length > 0) {
+      const sortedSubs = [...subjectsList].sort((a, b) => b.pct - a.pct || b.conducted - a.conducted);
+      bestSubName = sortedSubs[0].name;
+      bestSubPct = sortedSubs[0].pct;
+    }
 
-    // Best streak
-    const streakDisplay = `${this.maxStreak} days`;
-    const streakSub = this.maxStreak > 0 ? `Active streak: ${this.activeStreak} day${this.activeStreak !== 1 ? 's' : ''}` : 'Start attending to build a streak!';
+    const bestValEl = document.getElementById('insight-best-subject');
+    const bestSubEl = document.getElementById('insight-best-subject-sub');
+    if (bestValEl) {
+      bestValEl.textContent = bestSubName;
+      bestValEl.title = bestSubName;
+    }
+    if (bestSubEl) {
+      bestSubEl.textContent = bestSubPct === 100 ? '100% perfect attendance' : `${bestSubPct.toFixed(1)}% attendance`;
+    }
 
-    // Update DOM
-    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-    set('hm-ins-weakday-val', weakDay);
-    set('hm-ins-weakday-sub', weakDayPct);
-    set('hm-ins-bestsub-val', bestSubName);
-    set('hm-ins-bestsub-sub', bestSubPct);
-    set('hm-ins-missed-val',  missedDisplay);
-    set('hm-ins-missed-sub',  missedPct);
-    set('hm-ins-streak-val',  streakDisplay);
-    set('hm-ins-streak-sub',  streakSub);
+    // Classes Missed
+    const totalMissed = Math.max(0, totalConducted - totalAttended);
+    const missedPct = totalConducted > 0 ? ((totalMissed / totalConducted) * 100).toFixed(1) : '0.0';
 
-    // Color the weakest day card rose, best subject emerald
-    const weakCard = document.getElementById('hm-insight-weakday');
-    const bestCard = document.getElementById('hm-insight-bestsub');
-    if (weakCard) weakCard.style.borderColor = 'rgba(239,68,68,0.35)';
-    if (bestCard) bestCard.style.borderColor = 'rgba(16,185,129,0.35)';
+    const missedValEl = document.getElementById('insight-classes-missed');
+    const missedSubEl = document.getElementById('insight-classes-missed-sub');
+    if (missedValEl) missedValEl.textContent = `${totalMissed} class${totalMissed === 1 ? '' : 'es'}`;
+    if (missedSubEl) missedSubEl.textContent = `${missedPct}% of all classes skipped`;
+
+    // Longest Streak
+    const streakValEl = document.getElementById('insight-longest-streak');
+    const streakSubEl = document.getElementById('insight-longest-streak-sub');
+    if (streakValEl) streakValEl.textContent = `${this.maxStreak} day${this.maxStreak === 1 ? '' : 's'}`;
+    if (streakSubEl) streakSubEl.textContent = `Active streak: ${this.activeStreak} day${this.activeStreak === 1 ? '' : 's'}`;
   },
 
-  // ── 2. Day-of-Week DNA Bar Chart ───────────────────────────────────────────
-  renderDayOfWeekChart() {
-    const container = document.getElementById('hm-dow-chart');
-    if (!container) return;
+  renderWeeklyPattern() {
+    const chartContainer = document.getElementById('weekly-pattern-chart');
+    if (!chartContainer) return;
 
-    const todayStr = this.formatDate(new Date());
-    const dayLabels = ['Mon','Tue','Wed','Thu','Fri','Sat'];
-    const buckets = Array.from({ length: 6 }, () => ({ conducted: 0, attended: 0 }));
+    const days = [
+      { key: 1, label: 'Mon' },
+      { key: 2, label: 'Tue' },
+      { key: 3, label: 'Wed' },
+      { key: 4, label: 'Thu' },
+      { key: 5, label: 'Fri' },
+      { key: 6, label: 'Sat' }
+    ];
+
+    const dayTotals = { 1: { cond: 0, att: 0 }, 2: { cond: 0, att: 0 }, 3: { cond: 0, att: 0 }, 4: { cond: 0, att: 0 }, 5: { cond: 0, att: 0 }, 6: { cond: 0, att: 0 } };
 
     for (const [dateStr, info] of this.semesterData.entries()) {
-      if (dateStr > todayStr) continue;
-      const d = new Date(dateStr + 'T00:00:00');
-      const dotw = (d.getDay() + 6) % 7; // Mon=0 … Sat=5
-      if (dotw >= 6) continue; // skip Sunday
-      const cond = info.conducted || 0;
-      const att  = info.attended  || 0;
-      if (cond > 0) {
-        buckets[dotw].conducted += cond;
-        buckets[dotw].attended  += att;
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const dayOfWeek = new Date(y, m - 1, d).getDay();
+      if (dayTotals[dayOfWeek] && info.conducted > 0) {
+        dayTotals[dayOfWeek].cond += (info.conducted || 0);
+        dayTotals[dayOfWeek].att += (info.attended || 0);
       }
     }
 
-    const maxPct = Math.max(...buckets.map(b => b.conducted > 0 ? (b.attended / b.conducted) * 100 : 0), 1);
-    const minPctIdx = buckets.reduce((minI, b, i, arr) => {
-      const p = b.conducted > 0 ? b.attended / b.conducted : 1;
-      return (p < (arr[minI].conducted > 0 ? arr[minI].attended / arr[minI].conducted : 1)) ? i : minI;
-    }, 0);
-    const maxPctIdx = buckets.reduce((maxI, b, i, arr) => {
-      const p = b.conducted > 0 ? b.attended / b.conducted : 0;
-      return (p > (arr[maxI].conducted > 0 ? arr[maxI].attended / arr[maxI].conducted : 0)) ? i : maxI;
-    }, 0);
+    let html = '';
+    days.forEach(d => {
+      const stat = dayTotals[d.key];
+      const hasClasses = stat.cond > 0;
+      const pct = hasClasses ? Math.round((stat.att / stat.cond) * 100) : null;
 
-    container.innerHTML = buckets.map((b, i) => {
-      const pct = b.conducted > 0 ? (b.attended / b.conducted) * 100 : 0;
-      const heightPct = b.conducted > 0 ? Math.max(6, (pct / 100) * 100) : 4;
+      let fillClass = 'fill-muted';
+      if (pct !== null) {
+        if (pct >= 85) fillClass = 'fill-emerald';
+        else if (pct >= 75) fillClass = 'fill-amber';
+        else fillClass = 'fill-rose';
+      }
 
-      let color = 'var(--emerald)';
-      let opacity = '0.85';
-      if (i === minPctIdx && b.conducted > 0) { color = 'var(--rose)'; opacity = '1'; }
-      else if (i === maxPctIdx && b.conducted > 0) { color = 'var(--emerald)'; opacity = '1'; }
-      else if (pct < 75) { color = 'var(--amber)'; opacity = '0.75'; }
+      const pctText = pct !== null ? `${pct}%` : '—';
+      const heightVal = pct !== null ? Math.max(8, pct) : 0;
 
-      const pctLabel = b.conducted > 0 ? `${pct.toFixed(0)}%` : '—';
-
-      return `
-        <div class="hm-dow-bar-group" title="${dayLabels[i]}: ${pctLabel} (${b.attended}/${b.conducted} classes)">
-          <div class="hm-dow-bar-track">
-            <div class="hm-dow-bar-fill"
-                 data-pct="${pctLabel}"
-                 style="height:${heightPct}%; background:${color}; opacity:${opacity}; box-shadow: 0 0 8px ${color}55;">
-            </div>
+      html += `
+        <div class="bar-column">
+          <span class="bar-pct-label">${pctText}</span>
+          <div class="bar-track" title="${d.label}: ${stat.att}/${stat.cond} classes attended (${pctText})">
+            <div class="bar-fill ${fillClass}" style="height: ${heightVal}%;"></div>
           </div>
-          <span class="hm-dow-label">${dayLabels[i]}</span>
+          <span class="bar-name-label">${d.label}</span>
         </div>
       `;
-    }).join('');
+    });
+
+    chartContainer.innerHTML = html;
   },
 
-  // ── 3. Monthly Trend Bar Chart ─────────────────────────────────────────────
   renderMonthlyTrend() {
-    const container = document.getElementById('hm-monthly-chart');
-    if (!container) return;
+    const chartContainer = document.getElementById('monthly-trend-chart');
+    if (!chartContainer) return;
 
-    const todayStr = this.formatDate(new Date());
-
-    // Aggregate by month
-    const monthlyMap = new Map(); // 'YYYY-MM' -> { conducted, attended }
+    // Group by year-month
+    const monthMap = new Map();
     for (const [dateStr, info] of this.semesterData.entries()) {
-      if (dateStr > todayStr) continue;
-      const key = dateStr.substring(0, 7);
-      if (!monthlyMap.has(key)) monthlyMap.set(key, { conducted: 0, attended: 0 });
-      const mb = monthlyMap.get(key);
-      mb.conducted += info.conducted || 0;
-      mb.attended  += info.attended  || 0;
+      const ym = dateStr.substring(0, 7);
+      if (!monthMap.has(ym)) {
+        monthMap.set(ym, { cond: 0, att: 0 });
+      }
+      const mEntry = monthMap.get(ym);
+      mEntry.cond += (info.conducted || 0);
+      mEntry.att += (info.attended || 0);
     }
 
-    // Sort months chronologically, keep only those with classes
-    const months = Array.from(monthlyMap.entries())
-      .filter(([, b]) => b.conducted > 0)
-      .sort(([a], [b]) => a.localeCompare(b));
+    const sortedYMs = Array.from(monthMap.keys()).sort();
+    const activeMonths = sortedYMs.filter(ym => monthMap.get(ym).cond > 0);
+    const monthsToShow = activeMonths.length > 0 ? activeMonths.slice(-6) : sortedYMs.slice(-6);
 
-    if (months.length === 0) {
-      container.innerHTML = '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:20px;">No monthly data available yet.</div>';
-      return;
-    }
+    let html = '';
+    monthsToShow.forEach(ym => {
+      const [y, m] = ym.split('-').map(Number);
+      const monthName = new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'short' });
+      const stat = monthMap.get(ym) || { cond: 0, att: 0 };
+      const hasClasses = stat.cond > 0;
+      const pct = hasClasses ? Math.round((stat.att / stat.cond) * 100) : null;
 
-    const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      let fillClass = 'fill-muted';
+      if (pct !== null) {
+        if (pct >= 85) fillClass = 'fill-emerald';
+        else if (pct >= 75) fillClass = 'fill-amber';
+        else fillClass = 'fill-rose';
+      }
 
-    container.innerHTML = months.map(([key, b]) => {
-      const pct = (b.attended / b.conducted) * 100;
-      const heightPct = Math.max(6, pct);
-      const monthIdx = parseInt(key.split('-')[1], 10) - 1;
-      const label = MONTH_LABELS[monthIdx];
+      const pctText = pct !== null ? `${pct}%` : '—';
+      const heightVal = pct !== null ? Math.max(8, pct) : 0;
 
-      let color, glow;
-      if (pct >= 85)      { color = 'var(--emerald)'; glow = 'rgba(16,185,129,0.4)'; }
-      else if (pct >= 75) { color = 'var(--amber)';   glow = 'rgba(251,191,36,0.4)'; }
-      else                { color = 'var(--rose)';    glow = 'rgba(239,68,68,0.4)'; }
-
-      return `
-        <div class="hm-month-bar-group" title="${label}: ${pct.toFixed(1)}% (${b.attended}/${b.conducted})">
-          <div class="hm-month-bar-track">
-            <div class="hm-month-bar-fill"
-                 data-pct="${pct.toFixed(0)}%"
-                 style="height:${heightPct}%; background:${color}; box-shadow: 0 0 6px ${glow};">
-            </div>
+      html += `
+        <div class="bar-column">
+          <span class="bar-pct-label">${pctText}</span>
+          <div class="bar-track" title="${monthName} ${y}: ${stat.att}/${stat.cond} classes attended (${pctText})">
+            <div class="bar-fill ${fillClass}" style="height: ${heightVal}%;"></div>
           </div>
-          <span class="hm-month-label">${label}</span>
+          <span class="bar-name-label">${monthName}</span>
         </div>
       `;
-    }).join('');
+    });
+
+    if (monthsToShow.length === 0) {
+      html = '<div style="margin: auto; color: var(--foreground-muted); font-size: 0.8rem;">No monthly attendance history recorded yet</div>';
+    }
+
+    chartContainer.innerHTML = html;
   },
 
-  // ── 4. Subject Leaderboard ─────────────────────────────────────────────────
   renderSubjectLeaderboard() {
-    const container = document.getElementById('hm-leaderboard-list');
-    if (!container) return;
+    const listContainer = document.getElementById('subject-leaderboard-list');
+    if (!listContainer) return;
 
-    const todayStr = this.formatDate(new Date());
-    const subjectMap = new Map();
-
-    for (const [dateStr, info] of this.semesterData.entries()) {
-      if (dateStr > todayStr) continue;
-      if (!Array.isArray(info.classes)) continue;
-      info.classes.forEach(c => {
-        const code = c.fsubcode || c.code || 'UNKNOWN';
-        const name = c.fsubname || c.name || code;
-        const cnt  = parseInt(c.fnoclass || 1, 10);
-        const pres = (c.fpresent === '1' || c.fpresent === 1 || String(c.fpresent).toUpperCase() === 'P');
-        if (!subjectMap.has(code)) subjectMap.set(code, { name, conducted: 0, attended: 0 });
-        const sb = subjectMap.get(code);
-        sb.conducted += cnt;
-        if (pres) sb.attended += cnt;
+    let subjects = [];
+    if (window.SummaryView && Array.isArray(SummaryView.rawSubjects) && SummaryView.rawSubjects.length > 0) {
+      subjects = SummaryView.rawSubjects.map(s => {
+        const cond = parseInt(s.ftotalclass || s.conducted || 0, 10);
+        const att = parseInt(s.fpresentclass || s.attended || 0, 10);
+        const pct = cond > 0 ? (att / cond) * 100 : 0;
+        return {
+          code: s.fsubcode || s.code || '',
+          name: s.fsubname || s.name || s.fsubcode || '',
+          conducted: cond,
+          attended: att,
+          pct
+        };
       });
+    } else {
+      const subMap = new Map();
+      for (const info of this.semesterData.values()) {
+        if (Array.isArray(info.classes)) {
+          info.classes.forEach(c => {
+            const code = c.fsubcode || c.code;
+            const name = c.fsubname || c.name || code;
+            if (code) {
+              if (!subMap.has(code)) subMap.set(code, { code, name, conducted: 0, attended: 0 });
+              const entry = subMap.get(code);
+              const cnt = parseInt(c.fnoclass || 1, 10);
+              entry.conducted += cnt;
+              if (c.fpresent === '1' || c.attended > 0 || String(c.fpresent).toUpperCase() === 'P') {
+                entry.attended += cnt;
+              }
+            }
+          });
+        }
+      }
+      subjects = Array.from(subMap.values()).map(s => ({
+        ...s,
+        pct: s.conducted > 0 ? (s.attended / s.conducted) * 100 : 0
+      }));
     }
 
-    const ranked = Array.from(subjectMap.entries())
-      .filter(([, sb]) => sb.conducted > 0)
-      .map(([code, sb]) => ({ code, ...sb, pct: (sb.attended / sb.conducted) * 100 }))
-      .sort((a, b) => b.pct - a.pct);
+    subjects.sort((a, b) => b.pct - a.pct || b.conducted - a.conducted);
 
-    if (ranked.length === 0) {
-      container.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:16px 0;">No subject data available yet. Load the heatmap first.</div>';
+    if (subjects.length === 0) {
+      listContainer.innerHTML = '<div style="text-align: center; color: var(--foreground-muted); font-size: 0.8rem; padding: 20px;">No subject data found</div>';
       return;
     }
 
-    const RANK_CLASSES = ['gold', 'silver', 'bronze'];
-    const RANK_MEDALS  = ['🥇', '🥈', '🥉'];
+    let html = '';
+    subjects.forEach((sub, idx) => {
+      let rankBadge = '';
+      if (idx === 0) rankBadge = '🥇';
+      else if (idx === 1) rankBadge = '🥈';
+      else if (idx === 2) rankBadge = '🥉';
+      else rankBadge = `<span class="rank-num">#${idx + 1}</span>`;
 
-    container.innerHTML = ranked.map((s, i) => {
-      const rankClass = RANK_CLASSES[i] || '';
-      const rankLabel = i < 3 ? RANK_MEDALS[i] : `#${i + 1}`;
+      let progressClass = 'progress-rose';
+      let textClass = 'text-rose';
+      if (sub.pct >= 85) {
+        progressClass = 'progress-emerald';
+        textClass = 'text-emerald';
+      } else if (sub.pct >= 75) {
+        progressClass = 'progress-amber';
+        textClass = 'text-amber';
+      }
 
-      let pctColor, barColor;
-      if (s.pct >= 85)      { pctColor = 'var(--emerald)'; barColor = 'var(--emerald)'; }
-      else if (s.pct >= 75) { pctColor = 'var(--amber)';   barColor = 'var(--amber)'; }
-      else                  { pctColor = 'var(--rose)';    barColor = 'var(--rose)'; }
-
-      const safeCode = escapeHtml(s.code);
-      const safeName = escapeHtml(s.name.length > 40 ? s.name.substring(0, 38) + '…' : s.name);
-
-      return `
-        <div class="hm-lb-item" title="${escapeHtml(s.name)}: ${s.pct.toFixed(1)}% (${s.attended}/${s.conducted} classes)">
-          <div class="hm-lb-rank ${rankClass}">${rankLabel}</div>
-          <div>
-            <div class="hm-lb-name">${safeName}</div>
-            <div class="hm-lb-code">${safeCode}</div>
-          </div>
-          <div class="hm-lb-pct" style="color:${pctColor};">${s.pct.toFixed(1)}%</div>
-          <div style="grid-column:2/-1;margin-top:4px;">
-            <div style="height:4px;background:rgba(255,255,255,0.07);border-radius:3px;overflow:hidden;">
-              <div style="height:100%;width:${Math.min(100,s.pct)}%;background:${barColor};border-radius:3px;transition:width 0.8s cubic-bezier(.34,1.56,.64,1);box-shadow:0 0 6px ${barColor}55;"></div>
+      html += `
+        <div class="leaderboard-row" title="${sub.name} (${sub.code}): ${sub.attended}/${sub.conducted} classes (${sub.pct.toFixed(1)}%)">
+          <div class="leaderboard-row-top">
+            <div class="leaderboard-sub-info">
+              <span class="leaderboard-rank-badge">${rankBadge}</span>
+              <div class="leaderboard-sub-text">
+                <span class="leaderboard-sub-name">${sub.name}</span>
+                <span class="leaderboard-sub-code">${sub.code} • ${sub.attended}/${sub.conducted} classes attended</span>
+              </div>
             </div>
+            <span class="leaderboard-pct-val ${textClass}">${sub.pct.toFixed(1)}%</span>
+          </div>
+          <div class="leaderboard-progress-track">
+            <div class="leaderboard-progress-bar ${progressClass}" style="width: ${Math.min(100, Math.max(2, sub.pct))}%;"></div>
           </div>
         </div>
       `;
-    }).join('');
+    });
+
+    listContainer.innerHTML = html;
   },
 
   renderMetrics() {

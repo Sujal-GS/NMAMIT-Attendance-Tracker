@@ -2853,368 +2853,13 @@ body::before {
 }
 
 /* --------------------------------------------------------------------------
-   A1b. BELOW-HEATMAP ANALYTICS PANELS
-   Smart Insights | Day-of-Week DNA | Monthly Trend | Subject Leaderboard
-   -------------------------------------------------------------------------- */
-
-/* ROW 1: Smart Insights strip */
-.hm-insights-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  margin-top: 20px;
-  padding: 20px;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-xl);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-.hm-insight-card {
-  flex: 1 1 160px;
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 16px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.07);
-  border-radius: var(--radius-lg);
-  transition: background var(--transition-fast), border-color var(--transition-fast), transform 0.2s;
-}
-.hm-insight-card:hover {
-  background: rgba(255,255,255,0.06);
-  border-color: rgba(255,255,255,0.14);
-  transform: translateY(-2px);
-}
-
-.hm-insight-icon {
-  font-size: 22px;
-  line-height: 1;
-  flex-shrink: 0;
-  margin-top: 2px;
-  filter: drop-shadow(0 0 6px rgba(255,255,255,0.25));
-}
-
-.hm-insight-body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.hm-insight-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-  text-transform: uppercase;
-}
-
-.hm-insight-value {
-  font-family: var(--font-mono);
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-contrast);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.hm-insight-sub {
-  font-size: 11px;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* ROW 2 two-col layout */
-.hm-two-col-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-top: 16px;
-}
-
-/* Sub-cards shared base */
-.hm-sub-card {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-xl);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  padding: 20px;
-  overflow: hidden;
-}
-
-.hm-sub-card-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 18px;
-}
-
-.hm-sub-card-title {
-  font-family: var(--font-sans);
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text-contrast);
-  margin: 4px 0 2px;
-}
-
-.hm-sub-card-sub {
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-/* ── Day-of-Week DNA Chart ── */
-.hm-dow-chart {
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  height: 130px;
-  padding-bottom: 0;
-}
-
-.hm-dow-bar-group {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-}
-
-.hm-dow-bar-track {
-  width: 100%;
-  border-radius: 6px 6px 0 0;
-  background: rgba(255,255,255,0.05);
-  flex: 1;
-  position: relative;
-  overflow: hidden;
-  min-height: 80px;
-  display: flex;
-  align-items: flex-end;
-}
-
-.hm-dow-bar-fill {
-  width: 100%;
-  border-radius: 6px 6px 0 0;
-  transition: height 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
-  position: relative;
-  /* color set via inline style */
-}
-
-.hm-dow-bar-fill::after {
-  content: attr(data-pct);
-  position: absolute;
-  top: -22px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 9px;
-  font-family: var(--font-mono);
-  font-weight: 700;
-  color: var(--text-contrast);
-  white-space: nowrap;
-}
-
-.hm-dow-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-muted);
-  letter-spacing: 0.04em;
-}
-
-/* ── Monthly Trend Chart ── */
-.hm-monthly-chart {
-  display: flex;
-  align-items: flex-end;
-  gap: 6px;
-  height: 130px;
-}
-
-.hm-month-bar-group {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-  min-width: 0;
-}
-
-.hm-month-bar-track {
-  width: 100%;
-  border-radius: 4px 4px 0 0;
-  background: rgba(255,255,255,0.04);
-  flex: 1;
-  position: relative;
-  overflow: visible;
-  min-height: 80px;
-  display: flex;
-  align-items: flex-end;
-}
-
-.hm-month-bar-fill {
-  width: 100%;
-  border-radius: 4px 4px 0 0;
-  transition: height 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
-  position: relative;
-}
-
-.hm-month-bar-fill::after {
-  content: attr(data-pct);
-  position: absolute;
-  top: -20px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 8px;
-  font-family: var(--font-mono);
-  font-weight: 700;
-  color: var(--text-contrast);
-  white-space: nowrap;
-}
-
-.hm-month-label {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 600;
-  color: var(--text-muted);
-  letter-spacing: 0.03em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-  text-align: center;
-}
-
-/* 85% target line on monthly chart */
-.hm-monthly-chart-wrap {
-  position: relative;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-.hm-monthly-target-line {
-  position: absolute;
-  left: 0; right: 0;
-  height: 1px;
-  background: rgba(251, 191, 36, 0.45);
-  border-top: 1px dashed rgba(251, 191, 36, 0.6);
-  bottom: 0; /* set via JS inline style as % */
-  pointer-events: none;
-  z-index: 2;
-}
-.hm-monthly-target-line::after {
-  content: '85%';
-  position: absolute;
-  right: 4px;
-  top: -16px;
-  font-size: 9px;
-  font-family: var(--font-mono);
-  color: rgba(251, 191, 36, 0.9);
-  font-weight: 700;
-}
-
-/* ── Subject Leaderboard ── */
-.hm-leaderboard-card {
-  margin-top: 16px;
-}
-
-.hm-leaderboard-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.hm-lb-item {
-  display: grid;
-  grid-template-columns: 28px 1fr auto 80px;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  border-radius: var(--radius-md);
-  background: rgba(255,255,255,0.02);
-  border: 1px solid rgba(255,255,255,0.05);
-  transition: background var(--transition-fast), transform 0.2s;
-  cursor: default;
-}
-.hm-lb-item:hover {
-  background: rgba(255,255,255,0.05);
-  transform: translateX(3px);
-}
-
-.hm-lb-rank {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-muted);
-  text-align: center;
-}
-.hm-lb-rank.gold   { color: #FBBF24; }
-.hm-lb-rank.silver { color: #94A3B8; }
-.hm-lb-rank.bronze { color: #B07332; }
-
-.hm-lb-name {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-contrast);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.hm-lb-code {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text-muted);
-  margin-top: 1px;
-}
-
-.hm-lb-pct {
-  font-family: var(--font-mono);
-  font-size: 14px;
-  font-weight: 800;
-  text-align: right;
-  white-space: nowrap;
-}
-
-.hm-lb-bar-track {
-  height: 5px;
-  background: rgba(255,255,255,0.07);
-  border-radius: 3px;
-  overflow: hidden;
-  grid-column: 2 / -1;
-  display: none; /* shown on wider screens */
-}
-
-.hm-lb-bar-fill {
-  height: 100%;
-  border-radius: 3px;
-  transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-/* Animate panels in when they first appear */
-.hm-insights-row,
-.hm-two-col-row,
-.hm-leaderboard-card {
-  animation: fadeSlideUp 0.5s ease both;
-}
-.hm-two-col-row   { animation-delay: 0.1s; }
-.hm-leaderboard-card { animation-delay: 0.2s; }
-
-@keyframes fadeSlideUp {
-  from { opacity: 0; transform: translateY(18px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-/* --------------------------------------------------------------------------
    A2. FEATURE SPOTLIGHT BAR (ATTENDANCE WRAPPED & INSTALL APP)
-   Desktop: Hidden — Install/Wrapped buttons are already visible in the header navbar.
-   Mobile: Shown as full-width stacked cards (see @media max-width 768px below).
    -------------------------------------------------------------------------- */
 .feature-spotlight-bar {
-  display: none;
+  display: none; /* Hidden on desktop screens since Install and Wrapped are in the top navigation header */
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
 }
 
 .spotlight-card {
@@ -4213,6 +3858,395 @@ body::before {
 }
 
 /* --------------------------------------------------------------------------
+   D2. SMART INSIGHTS METRICS BAR
+   -------------------------------------------------------------------------- */
+.smart-insights-section {
+  margin-top: 24px;
+}
+
+.smart-insights-header {
+  margin-bottom: 12px;
+}
+
+.smart-insights-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.insight-card {
+  background: var(--glass-card);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  padding: 16px 16px;
+  box-shadow: var(--glass-specular), var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: all 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.insight-card:hover {
+  transform: translateY(-2px);
+}
+
+.insight-card-danger {
+  border-color: rgba(255, 69, 58, 0.25);
+  background: linear-gradient(135deg, rgba(255, 69, 58, 0.06) 0%, rgba(14, 14, 18, 0.85) 100%);
+}
+.insight-card-danger:hover {
+  border-color: rgba(255, 69, 58, 0.45);
+  box-shadow: 0 10px 24px rgba(255, 69, 58, 0.12);
+}
+
+.insight-card-success {
+  border-color: rgba(48, 209, 88, 0.25);
+  background: linear-gradient(135deg, rgba(48, 209, 88, 0.06) 0%, rgba(14, 14, 18, 0.85) 100%);
+}
+.insight-card-success:hover {
+  border-color: rgba(48, 209, 88, 0.45);
+  box-shadow: 0 10px 24px rgba(48, 209, 88, 0.12);
+}
+
+.insight-card-warning {
+  border-color: rgba(255, 159, 10, 0.25);
+  background: linear-gradient(135deg, rgba(255, 159, 10, 0.06) 0%, rgba(14, 14, 18, 0.85) 100%);
+}
+.insight-card-warning:hover {
+  border-color: rgba(255, 159, 10, 0.45);
+  box-shadow: 0 10px 24px rgba(255, 159, 10, 0.12);
+}
+
+.insight-card-fire {
+  border-color: rgba(255, 105, 0, 0.25);
+  background: linear-gradient(135deg, rgba(255, 105, 0, 0.06) 0%, rgba(14, 14, 18, 0.85) 100%);
+}
+.insight-card-fire:hover {
+  border-color: rgba(255, 105, 0, 0.45);
+  box-shadow: 0 10px 24px rgba(255, 105, 0, 0.12);
+}
+
+.insight-icon-box {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 1.25rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.icon-danger { background: rgba(255, 69, 58, 0.12); border-color: rgba(255, 69, 58, 0.25); }
+.icon-success { background: rgba(48, 209, 88, 0.12); border-color: rgba(48, 209, 88, 0.25); }
+.icon-warning { background: rgba(255, 159, 10, 0.12); border-color: rgba(255, 159, 10, 0.25); }
+.icon-fire { background: rgba(255, 105, 0, 0.12); border-color: rgba(255, 105, 0, 0.25); }
+
+.insight-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.insight-label {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--foreground-muted);
+  text-transform: uppercase;
+}
+
+.insight-val {
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+  margin: 2px 0 2px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.insight-sub {
+  font-size: 0.72rem;
+  color: var(--foreground-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --------------------------------------------------------------------------
+   D3. WEEKLY DNA & MONTHLY TREND BAR CHARTS
+   -------------------------------------------------------------------------- */
+.analytics-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.analytics-chart-card {
+  background: var(--glass-card);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  padding: 22px 24px;
+  box-shadow: var(--glass-specular), var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+.chart-card-header {
+  margin-bottom: 20px;
+}
+
+.chart-card-title {
+  font-size: 1.125rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 4px 0 4px 0;
+}
+
+.chart-card-subtitle {
+  font-size: 0.78rem;
+  color: var(--foreground-muted);
+}
+
+.vertical-bars-chart {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  height: 155px;
+  padding-top: 18px;
+  padding-bottom: 4px;
+}
+
+.bar-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  flex: 1;
+  min-width: 0;
+  gap: 6px;
+}
+
+.bar-pct-label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--foreground-muted);
+  height: 16px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.bar-track {
+  width: 100%;
+  max-width: 48px;
+  height: 95px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 7px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  position: relative;
+}
+
+.bar-fill {
+  width: 100%;
+  border-radius: 5px 5px 0 0;
+  transition: height 0.6s cubic-bezier(0.25, 1, 0.5, 1), background 0.3s ease;
+}
+
+.bar-fill.fill-emerald {
+  background: linear-gradient(180deg, #30d158 0%, rgba(48, 209, 88, 0.45) 100%);
+  box-shadow: 0 0 12px rgba(48, 209, 88, 0.35);
+}
+
+.bar-fill.fill-amber {
+  background: linear-gradient(180deg, #ffd60a 0%, rgba(255, 214, 10, 0.45) 100%);
+  box-shadow: 0 0 12px rgba(255, 214, 10, 0.35);
+}
+
+.bar-fill.fill-rose {
+  background: linear-gradient(180deg, #ff453a 0%, rgba(255, 69, 58, 0.45) 100%);
+  box-shadow: 0 0 12px rgba(255, 69, 58, 0.35);
+}
+
+.bar-fill.fill-muted {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.bar-name-label {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--foreground-muted);
+  text-align: center;
+  height: 16px;
+  line-height: 16px;
+}
+
+/* --------------------------------------------------------------------------
+   D4. SUBJECT LEADERBOARD CARD
+   -------------------------------------------------------------------------- */
+.leaderboard-card {
+  background: var(--glass-card);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  padding: 24px;
+  margin-top: 24px;
+  box-shadow: var(--glass-specular), var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+.leaderboard-header {
+  margin-bottom: 20px;
+}
+
+.leaderboard-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 4px 0 4px 0;
+}
+
+.leaderboard-subtitle {
+  font-size: 0.8125rem;
+  color: var(--foreground-muted);
+}
+
+.leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.leaderboard-row {
+  background: var(--glass-subcard);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all 0.2s ease;
+  cursor: default;
+}
+
+.leaderboard-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+.leaderboard-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.leaderboard-sub-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.leaderboard-rank-badge {
+  font-size: 0.95rem;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  min-width: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.rank-num {
+  font-size: 0.72rem;
+  color: var(--foreground-muted);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 7px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.leaderboard-sub-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.leaderboard-sub-name {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.leaderboard-sub-code {
+  font-size: 0.68rem;
+  color: var(--foreground-muted);
+  font-family: var(--font-mono);
+  margin-top: 1px;
+}
+
+.leaderboard-pct-val {
+  font-size: 0.95rem;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+}
+
+.leaderboard-progress-track {
+  width: 100%;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.leaderboard-progress-bar {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.progress-emerald {
+  background: linear-gradient(90deg, #30d158, #34c759);
+  box-shadow: 0 0 10px rgba(48, 209, 88, 0.4);
+}
+
+.progress-amber {
+  background: linear-gradient(90deg, #ffd60a, #ff9f0a);
+  box-shadow: 0 0 10px rgba(255, 214, 10, 0.4);
+}
+
+.progress-rose {
+  background: linear-gradient(90deg, #ff453a, #ff3b30);
+  box-shadow: 0 0 10px rgba(255, 69, 58, 0.4);
+}
+
+/* --------------------------------------------------------------------------
    E. ATTENDANCE WRAPPED STORY CARD MODAL
    -------------------------------------------------------------------------- */
 .wrapped-modal-card {
@@ -4379,39 +4413,11 @@ body::before {
     display: none !important;
   }
 
-  /* Feature Spotlight Bar Mobile: Revealed here since desktop hides it entirely */
+  /* Feature Spotlight Bar Mobile */
   .feature-spotlight-bar {
-    display: grid !important;
     grid-template-columns: 1fr !important;
     gap: 10px !important;
     margin-bottom: 16px !important;
-  }
-
-  /* Analytics Panels: Mobile stack */
-  .hm-two-col-row {
-    grid-template-columns: 1fr !important;
-  }
-
-  .hm-insights-row {
-    padding: 14px !important;
-    gap: 10px !important;
-  }
-
-  .hm-insight-card {
-    flex: 1 1 140px !important;
-    padding: 12px !important;
-  }
-
-  .hm-insight-value {
-    font-size: 15px !important;
-  }
-
-  .hm-lb-item {
-    grid-template-columns: 24px 1fr auto !important;
-  }
-
-  .hm-lb-item > .hm-lb-pct {
-    /* show pct in 3rd column on mobile */
   }
 
   .spotlight-card {
@@ -5078,6 +5084,66 @@ body::before {
     padding: 6px 10px !important;
   }
 
+  /* Smart Insights Mobile */
+  .smart-insights-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+
+  .insight-card {
+    padding: 12px 12px !important;
+    gap: 10px !important;
+  }
+
+  .insight-icon-box {
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 1.1rem !important;
+  }
+
+  .insight-val {
+    font-size: 0.95rem !important;
+  }
+
+  .insight-sub {
+    font-size: 0.68rem !important;
+  }
+
+  /* Analytics Charts Mobile */
+  .analytics-charts-grid {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+
+  .analytics-chart-card {
+    padding: 18px 16px !important;
+  }
+
+  .vertical-bars-chart {
+    height: 140px !important;
+  }
+
+  .bar-track {
+    height: 85px !important;
+  }
+
+  /* Leaderboard Mobile */
+  .leaderboard-card {
+    padding: 18px 16px !important;
+  }
+
+  .leaderboard-row {
+    padding: 12px 14px !important;
+  }
+
+  .leaderboard-sub-name {
+    font-size: 0.8rem !important;
+  }
+
+  .leaderboard-pct-val {
+    font-size: 0.875rem !important;
+  }
+
   /* Attendance Wrapped Modal Mobile */
   .wrapped-modal-card {
     padding: 18px 14px !important;
@@ -5086,6 +5152,9 @@ body::before {
 }
 
 @media (max-width: 480px) {
+  .smart-insights-grid {
+    grid-template-columns: 1fr !important;
+  }
   .cal-legend {
     display: none;
   }

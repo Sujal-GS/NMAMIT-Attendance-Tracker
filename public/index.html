@@ -9,7 +9,6 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="NMAMIT Attendance">
-  <meta name="referrer" content="no-referrer">
   <link rel="manifest" href="/manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -702,97 +701,105 @@
           </div>
         </div>
 
+        <!-- SMART INSIGHTS SECTION -->
+        <div class="smart-insights-section">
+          <div class="smart-insights-header">
+            <span class="section-tag">// SMART INSIGHTS</span>
+          </div>
+          <div class="smart-insights-grid">
+            <!-- Weakest Day -->
+            <div class="insight-card insight-card-danger">
+              <div class="insight-icon-box icon-danger">
+                <span class="insight-emoji">📅</span>
+              </div>
+              <div class="insight-info">
+                <span class="insight-label">WEAKEST DAY</span>
+                <h4 class="insight-val" id="insight-weakest-day">—</h4>
+                <p class="insight-sub" id="insight-weakest-day-sub">—% avg attendance</p>
+              </div>
+            </div>
+
+            <!-- Best Subject -->
+            <div class="insight-card insight-card-success">
+              <div class="insight-icon-box icon-success">
+                <span class="insight-emoji">🏆</span>
+              </div>
+              <div class="insight-info">
+                <span class="insight-label">BEST SUBJECT</span>
+                <h4 class="insight-val" id="insight-best-subject">—</h4>
+                <p class="insight-sub" id="insight-best-subject-sub">—% perfect attendance</p>
+              </div>
+            </div>
+
+            <!-- Classes Missed -->
+            <div class="insight-card insight-card-warning">
+              <div class="insight-icon-box icon-warning">
+                <span class="insight-emoji">⚠️</span>
+              </div>
+              <div class="insight-info">
+                <span class="insight-label">CLASSES MISSED</span>
+                <h4 class="insight-val" id="insight-classes-missed">— classes</h4>
+                <p class="insight-sub" id="insight-classes-missed-sub">—% of all classes skipped</p>
+              </div>
+            </div>
+
+            <!-- Longest Streak -->
+            <div class="insight-card insight-card-fire">
+              <div class="insight-icon-box icon-fire">
+                <span class="insight-emoji">🔥</span>
+              </div>
+              <div class="insight-info">
+                <span class="insight-label">LONGEST STREAK</span>
+                <h4 class="insight-val" id="insight-longest-streak">— days</h4>
+                <p class="insight-sub" id="insight-longest-streak-sub">Active streak: —</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- WEEKLY DNA & MONTHLY TREND ROW -->
+        <div class="analytics-charts-grid">
+          <!-- Day-of-Week Pattern -->
+          <div class="analytics-chart-card">
+            <div class="chart-card-header">
+              <span class="section-tag">// WEEKLY DNA</span>
+              <h3 class="chart-card-title">Day-of-Week Pattern</h3>
+              <p class="chart-card-subtitle">Which day you attend best &amp; worst</p>
+            </div>
+            <div class="vertical-bars-chart" id="weekly-pattern-chart">
+              <!-- Dynamically populated bars for Mon, Tue, Wed, Thu, Fri, Sat -->
+            </div>
+          </div>
+
+          <!-- Month-over-Month Trend -->
+          <div class="analytics-chart-card">
+            <div class="chart-card-header">
+              <span class="section-tag">// TREND</span>
+              <h3 class="chart-card-title">Month-over-Month Trend</h3>
+              <p class="chart-card-subtitle">Attendance % by calendar month</p>
+            </div>
+            <div class="vertical-bars-chart" id="monthly-trend-chart">
+              <!-- Dynamically populated bars for months -->
+            </div>
+          </div>
+        </div>
+
+        <!-- SUBJECT LEADERBOARD -->
+        <div class="leaderboard-card">
+          <div class="leaderboard-header">
+            <div class="leaderboard-header-left">
+              <span class="section-tag">// SUBJECT LEADERBOARD</span>
+              <h3 class="leaderboard-title">Subjects Ranked by Attendance</h3>
+              <p class="leaderboard-subtitle">From highest to lowest — hover for class counts</p>
+            </div>
+          </div>
+          <div class="leaderboard-list" id="subject-leaderboard-list">
+            <!-- Dynamically populated ranked subject rows -->
+          </div>
+        </div>
+
         <!-- Global Floating Heatmap Tooltip (Positioned outside scroll area to avoid clipping) -->
         <div id="heatmap-tooltip" class="heatmap-tooltip hidden" role="tooltip"></div>
-
-        <!-- ═══════════════════════════════════════════════════════════════════
-             BELOW-HEATMAP ANALYTICS PANELS
-        ════════════════════════════════════════════════════════════════════ -->
-
-        <!-- ROW 1: Smart Insights -->
-        <div class="hm-insights-row" id="hm-insights-row">
-          <div class="section-tag" style="margin-bottom: 14px; width: 100%;">// SMART INSIGHTS</div>
-          <div class="hm-insight-card" id="hm-insight-weakday">
-            <div class="hm-insight-icon">📅</div>
-            <div class="hm-insight-body">
-              <div class="hm-insight-label">Weakest Day</div>
-              <div class="hm-insight-value" id="hm-ins-weakday-val">—</div>
-              <div class="hm-insight-sub" id="hm-ins-weakday-sub">—</div>
-            </div>
-          </div>
-          <div class="hm-insight-card" id="hm-insight-bestsub">
-            <div class="hm-insight-icon">🏆</div>
-            <div class="hm-insight-body">
-              <div class="hm-insight-label">Best Subject</div>
-              <div class="hm-insight-value" id="hm-ins-bestsub-val">—</div>
-              <div class="hm-insight-sub" id="hm-ins-bestsub-sub">—</div>
-            </div>
-          </div>
-          <div class="hm-insight-card" id="hm-insight-risk">
-            <div class="hm-insight-icon">⚠️</div>
-            <div class="hm-insight-body">
-              <div class="hm-insight-label">Classes Missed</div>
-              <div class="hm-insight-value" id="hm-ins-missed-val">—</div>
-              <div class="hm-insight-sub" id="hm-ins-missed-sub">—</div>
-            </div>
-          </div>
-          <div class="hm-insight-card" id="hm-insight-streak">
-            <div class="hm-insight-icon">🔥</div>
-            <div class="hm-insight-body">
-              <div class="hm-insight-label">Longest Streak</div>
-              <div class="hm-insight-value" id="hm-ins-streak-val">—</div>
-              <div class="hm-insight-sub" id="hm-ins-streak-sub">—</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ROW 2: Day-of-Week DNA + Monthly Trend (side by side on desktop) -->
-        <div class="hm-two-col-row">
-
-          <!-- Day-of-Week Attendance DNA -->
-          <div class="hm-sub-card" id="hm-dayofweek-card">
-            <div class="hm-sub-card-header">
-              <div>
-                <div class="section-tag">// WEEKLY DNA</div>
-                <div class="hm-sub-card-title">Day-of-Week Pattern</div>
-                <div class="hm-sub-card-sub">Which day you attend best & worst</div>
-              </div>
-            </div>
-            <div class="hm-dow-chart" id="hm-dow-chart">
-              <!-- Rendered by JS -->
-            </div>
-          </div>
-
-          <!-- Monthly Trend -->
-          <div class="hm-sub-card" id="hm-monthly-card">
-            <div class="hm-sub-card-header">
-              <div>
-                <div class="section-tag">// TREND</div>
-                <div class="hm-sub-card-title">Month-over-Month Trend</div>
-                <div class="hm-sub-card-sub">Attendance % by calendar month</div>
-              </div>
-            </div>
-            <div class="hm-monthly-chart" id="hm-monthly-chart">
-              <!-- Rendered by JS -->
-            </div>
-          </div>
-
-        </div>
-
-        <!-- ROW 3: Subject Leaderboard (full width) -->
-        <div class="hm-sub-card hm-leaderboard-card" id="hm-leaderboard-card">
-          <div class="hm-sub-card-header">
-            <div>
-              <div class="section-tag">// SUBJECT LEADERBOARD</div>
-              <div class="hm-sub-card-title">Subjects Ranked by Attendance</div>
-              <div class="hm-sub-card-sub">From highest to lowest — hover for class counts</div>
-            </div>
-          </div>
-          <div class="hm-leaderboard-list" id="hm-leaderboard-list">
-            <!-- Rendered by JS -->
-          </div>
-        </div>
-
       </section>
     </div>
   </div>
@@ -908,7 +915,7 @@
   <!-- Scripts -->
   <script src="js/clickspark.js"></script>
   <script src="js/api.js"></script>
-  <script src="js/calendar.js?v=6"></script>
+  <script src="js/calendar.js"></script>
   <script src="js/summary.js?v=6"></script>
   <script src="js/heatmap.js?v=6"></script>
   <script src="js/simulator.js?v=6"></script>

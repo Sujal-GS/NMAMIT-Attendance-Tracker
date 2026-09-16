@@ -1,66 +1,21 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3050;
 const PORTAL_BASE = 'https://studentportal.universitysolutions.in';
 
-// ── CORS Configuration ───────────────────────────────────────────────
 app.use(cors());
-
-// ── Security Headers ──────────────────────────────────────────────────
-app.use((req, res, next) => {
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('X-XSS-Protection', '1; mode=block');
-  res.setHeader('Referrer-Policy', 'no-referrer');
-  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
-  next();
-});
-
-app.use(express.json({ limit: '50kb' }));
-app.use(express.urlencoded({ extended: true, limit: '50kb' }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
-
-// ── Input Validation Helpers ─────────────────────────────────────────
-function isValidDate(str) {
-  if (typeof str !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(str)) return false;
-  const d = new Date(str + 'T00:00:00');
-  return !isNaN(d.getTime());
-}
-
-function isValidYearMonth(year, month) {
-  const y = parseInt(year, 10);
-  const m = parseInt(month, 10);
-  return Number.isInteger(y) && Number.isInteger(m) && y >= 2015 && y <= 2035 && m >= 1 && m <= 12;
-}
-
-// ── Login Rate Limiting (in-memory, per IP) ──────────────────────────
-const loginAttempts = new Map(); // ip -> { count, windowStart }
-const RATE_LIMIT_MAX = 20;
-const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 min
-
-function isLoginRateLimited(ip) {
-  const now = Date.now();
-  const entry = loginAttempts.get(ip) || { count: 0, windowStart: now };
-  if (now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
-    entry.count = 1;
-    entry.windowStart = now;
-    loginAttempts.set(ip, entry);
-    return false;
-  }
-  entry.count++;
-  loginAttempts.set(ip, entry);
-  return entry.count > RATE_LIMIT_MAX;
-}
 
 // In-memory session store: token -> { cookies, regno, univcode, studentInfo, isDemo, cache }
 const sessions = new Map();
 
-// Helper to make requests with proper headers, cookie handling, and automatic retries
-async function portalFetch(endpoint, options = {}, session = null, maxRetries = 2) {
+// Helper to make requests with proper headers and cookie handling
+async function portalFetch(endpoint, options = {}, session = null) {
   const url = endpoint.startsWith('http') ? endpoint : `${PORTAL_BASE}/${endpoint.replace(/^\//, '')}`;
   const headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -78,63 +33,35 @@ async function portalFetch(endpoint, options = {}, session = null, maxRetries = 
     headers['Cookie'] = cookieStr;
   }
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout per attempt
+  const response = await fetch(url, {
+    ...options,
+    headers
+  });
 
-      const response = await fetch(url, {
-        ...options,
-        headers,
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      // Extract set-cookie headers
-      if (session && response.headers.getSetCookie) {
-        const rawCookies = response.headers.getSetCookie();
-        rawCookies.forEach(c => {
-          const parts = c.split(';')[0].split('=');
-          if (parts.length >= 2) {
-            session.cookies[parts[0].trim()] = parts.slice(1).join('=').trim();
-          }
-        });
-      } else if (session && response.headers.get('set-cookie')) {
-        const cookieHeader = response.headers.get('set-cookie');
-        const parts = cookieHeader.split(';')[0].split('=');
-        if (parts.length >= 2) {
-          session.cookies[parts[0].trim()] = parts.slice(1).join('=').trim();
-        }
+  // Extract set-cookie headers
+  if (session && response.headers.getSetCookie) {
+    const rawCookies = response.headers.getSetCookie();
+    rawCookies.forEach(c => {
+      const parts = c.split(';')[0].split('=');
+      if (parts.length >= 2) {
+        session.cookies[parts[0].trim()] = parts.slice(1).join('=').trim();
       }
-
-      return response;
-    } catch (err) {
-      if (attempt < maxRetries) {
-        // Wait before retrying (200ms, 400ms...)
-        await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)));
-        continue;
-      }
-      throw err;
+    });
+  } else if (session && response.headers.get('set-cookie')) {
+    const cookieHeader = response.headers.get('set-cookie');
+    const parts = cookieHeader.split(';')[0].split('=');
+    if (parts.length >= 2) {
+      session.cookies[parts[0].trim()] = parts.slice(1).join('=').trim();
     }
   }
+
+  return response;
 }
 
-// ── Cryptographically-secure session ID ─────────────────────────────
+// Generate token
 function generateSessionId() {
-  return crypto.randomBytes(32).toString('hex');
+  return 'sess_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
 }
-
-// ── Session TTL Cleanup (12 h) ────────────────────────────────────────
-const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, sess] of sessions.entries()) {
-    if (sess.createdAt && now - sess.createdAt > SESSION_TTL_MS) {
-      sessions.delete(key);
-    }
-  }
-}, 30 * 60 * 1000);
 
 // --- Demo Data Generator ---
 const DEMO_SUBJECTS = [
@@ -257,7 +184,7 @@ app.get('/api/captcha', async (req, res) => {
       data = { captcha: Math.floor(100000 + Math.random() * 900000).toString() };
     }
 
-    const captchaToken = crypto.randomBytes(16).toString('hex');
+    const captchaToken = 'cap_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
     preAuthSessions.set(captchaToken, {
       cookies: sessionObj.cookies,
       captcha: data.captcha || '839201',
@@ -300,7 +227,6 @@ app.post('/api/login', async (req, res) => {
         fexamname: 'Semester 5 Examination 2026'
       },
       isDemo: true,
-      createdAt: Date.now(),
       cache: new Map()
     });
 
@@ -316,12 +242,6 @@ app.post('/api/login', async (req, res) => {
     return res.status(400).json({ success: false, message: 'Registration number / Mobile number and password are required.' });
   }
 
-  // Login rate limiting
-  const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
-  if (isLoginRateLimited(clientIp)) {
-    return res.status(429).json({ success: false, message: 'Too many login attempts. Please wait 15 minutes and try again.' });
-  }
-
   try {
     const sessionId = generateSessionId();
     const sessionObj = {
@@ -330,7 +250,6 @@ app.post('/api/login', async (req, res) => {
       univcode: univcode.trim(),
       studentInfo: null,
       isDemo: false,
-      createdAt: Date.now(),
       cache: new Map()
     };
 
@@ -359,9 +278,11 @@ app.post('/api/login', async (req, res) => {
       }
     }
 
+    const cleanedRegno = regno.replace(/["'& ]/g, '');
+    const cleanedPasswd = passwd.replace(/["'& ]/g, '');
+
     // The student portal formats parameters as: &regno=...&passwd=...&captcha=...
-    // encodeURIComponent handles all special characters safely — do NOT strip password chars.
-    const bodyString = `&regno=${encodeURIComponent(regno.trim())}&passwd=${encodeURIComponent(passwd)}&captcha=${encodeURIComponent(finalCaptcha)}`;
+    const bodyString = `&regno=${encodeURIComponent(cleanedRegno)}&passwd=${encodeURIComponent(cleanedPasswd)}&captcha=${encodeURIComponent(finalCaptcha)}`;
 
     const signinResp = await portalFetch('signin.php', {
       method: 'POST',
@@ -429,8 +350,8 @@ app.post('/api/login', async (req, res) => {
       isDemo: false
     });
   } catch (err) {
-    console.error('Login error:', err.message);
-    res.status(500).json({ success: false, message: 'Portal connection failed. Please try again later.' });
+    console.error('Login error:', err);
+    res.status(500).json({ success: false, message: 'Portal connection failed: ' + err.message });
   }
 });
 
@@ -456,8 +377,7 @@ app.get('/api/student-info', authMiddleware, (req, res) => {
 // 5. Attendance Summary (Subject-wise)
 app.get('/api/attendance-summary', authMiddleware, async (req, res) => {
   const session = req.userSession;
-  const rawDate = req.query.date;
-  const date = isValidDate(rawDate) ? rawDate : new Date().toISOString().split('T')[0];
+  const date = req.query.date || new Date().toISOString().split('T')[0];
 
   if (session.isDemo) {
     return res.json({
@@ -514,9 +434,6 @@ app.post('/api/attendance-daily', authMiddleware, async (req, res) => {
 
   if (!date) {
     return res.status(400).json({ success: false, message: 'Date is required (YYYY-MM-DD).' });
-  }
-  if (!isValidDate(date)) {
-    return res.status(400).json({ success: false, message: 'Invalid date format. Expected YYYY-MM-DD.' });
   }
 
   if (session.isDemo) {
@@ -590,9 +507,6 @@ app.post('/api/attendance-month', authMiddleware, async (req, res) => {
   if (!year || !month) {
     return res.status(400).json({ success: false, message: 'Year and month are required.' });
   }
-  if (!isValidYearMonth(year, month)) {
-    return res.status(400).json({ success: false, message: 'Invalid year or month value.' });
-  }
 
   const daysInMonth = new Date(year, month, 0).getDate();
   const dateList = [];
@@ -622,7 +536,7 @@ app.post('/api/attendance-month', authMiddleware, async (req, res) => {
   }
 
   // For live portal: fetch concurrently in small chunks to avoid overload
-  const chunkSize = 3;
+  const chunkSize = 5;
   for (let i = 0; i < dateList.length; i += chunkSize) {
     const chunk = dateList.slice(i, i + chunkSize);
     await Promise.all(chunk.map(async (dateStr) => {

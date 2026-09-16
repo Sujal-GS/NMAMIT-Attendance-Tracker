@@ -2,16 +2,6 @@
  * Subject Summary & 85% Attendance Bunk Planner
  */
 
-// ── HTML escaping to prevent XSS via server-supplied data ────────────────────────
-function escapeHtml(str) {
-  return String(str === null || str === undefined ? '' : str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;');
-}
-
 const SummaryView = {
   rawSubjects: [],
   simulatedDeltas: new Map(), // subCode -> { extraConducted: 0, extraAttended: 0 }
@@ -43,21 +33,6 @@ const SummaryView = {
       searchInput.addEventListener('input', (e) => {
         this.searchQuery = e.target.value.toLowerCase().trim();
         this.render();
-      });
-    }
-
-    // Delegated event for simulator buttons (avoids XSS via inline onclick)
-    const subjectsGrid = document.getElementById('subjects-grid');
-    if (subjectsGrid) {
-      subjectsGrid.addEventListener('click', (e) => {
-        const btn = e.target.closest('[data-sim-action]');
-        if (!btn) return;
-        const action = btn.dataset.simAction;
-        const code = btn.dataset.simCode;
-        if (!code) return;
-        if (action === 'attend') this.simulate(code, 1, 1);
-        else if (action === 'miss') this.simulate(code, 1, 0);
-        else if (action === 'reset') this.resetSimulation(code);
       });
     }
   },
@@ -376,7 +351,7 @@ const SummaryView = {
             <circle cx="11" cy="11" r="8"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
-          <p>No subjects match your search "${escapeHtml(this.searchQuery)}".</p>
+          <p>No subjects match your search "${this.searchQuery}".</p>
         </div>
       `;
       return;
@@ -386,8 +361,6 @@ const SummaryView = {
     filtered.forEach(s => {
       const code = s.fsubcode || 'N/A';
       const name = s.fsubname || 'Course Name';
-      const escapedCode = escapeHtml(code);
-      const escapedName = escapeHtml(name);
 
       const sim = this.simulatedDeltas.get(code) || { extraConducted: 0, extraAttended: 0 };
       const baseCond = parseInt(s.conducted || 0, 10);
@@ -446,12 +419,12 @@ const SummaryView = {
       const hasSimulation = sim.extraConducted > 0;
 
       cardsHtml += `
-        <div class="subject-card" data-subcode="${escapedCode}">
+        <div class="subject-card" data-subcode="${code}">
           <!-- Header -->
           <div class="subject-card-header">
             <div class="subject-identity">
-              <span class="subject-code-tag">${escapedCode}</span>
-              <h4 class="subject-card-title">${escapedName}</h4>
+              <span class="subject-code-tag">${code}</span>
+              <h4 class="subject-card-title">${name}</h4>
             </div>
             <div class="subject-percentage-badge">
               <span class="subject-pct-number ${textClass}">${pct.toFixed(1)}%</span>
@@ -486,9 +459,9 @@ const SummaryView = {
               ${hasSimulation ? `Sim: +${sim.extraAttended} att / +${sim.extraConducted} total` : 'What-If Simulator'}
             </span>
             <div class="sim-actions">
-              <button class="sim-btn" data-sim-action="attend" data-sim-code="${escapedCode}" title="Simulate attending next class">+1 Attend</button>
-              <button class="sim-btn sim-btn-danger" data-sim-action="miss" data-sim-code="${escapedCode}" title="Simulate skipping next class">+1 Miss</button>
-              ${hasSimulation ? `<button class="sim-reset-btn" data-sim-action="reset" data-sim-code="${escapedCode}">Reset</button>` : ''}
+              <button class="sim-btn" onclick="SummaryView.simulate('${code}', 1, 1)" title="Simulate attending next class">+1 Attend</button>
+              <button class="sim-btn sim-btn-danger" onclick="SummaryView.simulate('${code}', 1, 0)" title="Simulate skipping next class">+1 Miss</button>
+              ${hasSimulation ? `<button class="sim-reset-btn" onclick="SummaryView.resetSimulation('${code}')">Reset</button>` : ''}
             </div>
           </div>
         </div>
