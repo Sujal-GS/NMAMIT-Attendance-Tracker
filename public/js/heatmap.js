@@ -194,9 +194,15 @@ const HeatmapView = {
         monthsToFetch.push({ year: y, month: m });
       }
 
-      const results = await Promise.all(
-        monthsToFetch.map(({ year, month }) => API.getMonthAttendance(year, month).catch(() => ({})))
-      );
+      // Fetch in chunks of 2 months to prevent overwhelming the university portal
+      const results = [];
+      for (let i = 0; i < monthsToFetch.length; i += 2) {
+        const chunk = monthsToFetch.slice(i, i + 2);
+        const chunkRes = await Promise.all(
+          chunk.map(({ year, month }) => API.getMonthAttendance(year, month).catch(() => ({})))
+        );
+        results.push(...chunkRes);
+      }
 
       this.semesterData.clear();
       results.forEach(res => {

@@ -67,6 +67,7 @@ async function portalFetch(endpoint, options = {}, session = null) {
     'Origin': PORTAL_BASE,
     'Referer': `${PORTAL_BASE}/index.html`,
     'X-Requested-With': 'XMLHttpRequest',
+    'Connection': 'close',
     ...(options.headers || {})
   };
 
