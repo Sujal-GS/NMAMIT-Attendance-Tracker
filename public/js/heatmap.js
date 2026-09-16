@@ -172,16 +172,29 @@ const HeatmapView = {
       const currentYear = today.getFullYear();
       const currentMonth = today.getMonth() + 1; // 1-12
 
+      // Semester starts in August
+      let startYear = currentYear;
+      if (currentMonth < 8) {
+        startYear = currentYear - 1;
+      }
+
+      // Collect months from August up to the current month
+      const semesterMonths = [];
+      let y = startYear;
+      let m = 8;
+      while (y < currentYear || (y === currentYear && m <= currentMonth)) {
+        semesterMonths.push({ year: y, month: m });
+        m++;
+        if (m > 12) {
+          m = 1;
+          y++;
+        }
+      }
+
       // Check cache first across previous Calendar fetches and sessionStorage
       const monthsToFetch = [];
-      for (let i = 7; i >= 0; i--) {
-        let m = currentMonth - i;
-        let y = currentYear;
-        if (m <= 0) {
-          m += 12;
-          y -= 1;
-        }
-        const cacheKey = `${y}-${String(m).padStart(2, '0')}`;
+      for (const { year: sY, month: sM } of semesterMonths) {
+        const cacheKey = `${sY}-${String(sM).padStart(2, '0')}`;
         let cached = window.CalendarView && window.CalendarView.monthDataCache ? window.CalendarView.monthDataCache.get(cacheKey) : null;
         if (!cached) {
           try {
@@ -200,7 +213,7 @@ const HeatmapView = {
             this.semesterData.set(dateStr, info);
           }
         } else {
-          monthsToFetch.push({ year: y, month: m });
+          monthsToFetch.push({ year: sY, month: sM });
         }
       }
 
@@ -211,7 +224,7 @@ const HeatmapView = {
 
       if (monthsToFetch.length === 0) return;
 
-      // Fetch uncached months in small chunks (2 at a time) to prevent Vercel 10s timeouts & portal overload
+      // Fetch uncached months in small chunks (2 at a time)
       const chunkSize = 2;
       for (let i = 0; i < monthsToFetch.length; i += chunkSize) {
         const chunk = monthsToFetch.slice(i, i + chunkSize);
@@ -709,18 +722,24 @@ const HeatmapView = {
 
     const today = new Date();
     const todayStr = this.formatDate(today);
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth() + 1;
 
-    // Find upcoming Sunday (end of current week)
-    const endOfWeek = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const dayOfWeek = endOfWeek.getDay(); // 0 = Sun
-    const daysUntilSunday = (7 - dayOfWeek) % 7;
-    endOfWeek.setDate(endOfWeek.getDate() + daysUntilSunday);
+    // Semester starts in August
+    let semesterStartYear = currentYear;
+    if (currentMonth < 8) {
+      semesterStartYear = currentYear - 1;
+    }
 
-    // Build 32 weeks (224 days) for authentic GitHub-style span
-    const totalWeeks = 32;
+    // Start on the Monday of the week containing August 1st
+    const aug1 = new Date(semesterStartYear, 7, 1);
+    const dayOfAug1 = aug1.getDay(); // 0 = Sun, 1 = Mon...
+    const diffToMonday = (dayOfAug1 + 6) % 7;
+    const startDate = new Date(semesterStartYear, 7, 1 - diffToMonday);
+
+    // Standard university semester span: 22 weeks (August through December/January)
+    const totalWeeks = 22;
     const totalDays = totalWeeks * 7;
-    const startDate = new Date(endOfWeek.getFullYear(), endOfWeek.getMonth(), endOfWeek.getDate());
-    startDate.setDate(startDate.getDate() - totalDays + 1);
 
     const cellWidth = 16;
     const cellGap = 4;
@@ -778,7 +797,7 @@ const HeatmapView = {
       }
     });
 
-    const totalGridWidth = totalWeeks * colWidth;
+    const totalGridWidth = weeks.length * colWidth;
 
     // Render Month Headers with EXACT pixel alignment matching the column widths
     if (monthsContainer) {
