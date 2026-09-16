@@ -1,0 +1,24 @@
+{
+  "name": "NMAMIT Attendance Tracker",
+  "short_name": "Attendance",
+  "description": "Real-time academic attendance tracker, 85% buffer audit & timetable",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192' fill='none'%3E%3Crect width='192' height='192' rx='42' fill='%23000000'/%3E%3Crect x='1' y='1' width='190' height='190' rx='41' stroke='rgba(255,255,255,0.2)' stroke-width='2'/%3E%3Cpath d='M96 42L146 72V122L96 152L46 122V72L96 42Z' stroke='%2330D158' stroke-width='10' stroke-linejoin='round'/%3E%3Cpath d='M76 96L90 110L122 78' stroke='%23ffffff' stroke-width='10' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' fill='none'%3E%3Crect width='512' height='512' rx='112' fill='%23000000'/%3E%3Crect x='2' y='2' width='508' height='508' rx='110' stroke='rgba(255,255,255,0.2)' stroke-width='4'/%3E%3Cpath d='M256 112L390 192V322L256 402L122 322V192L256 112Z' stroke='%2330D158' stroke-width='26' stroke-linejoin='round'/%3E%3Cpath d='M204 256L240 292L320 212' stroke='%23ffffff' stroke-width='26' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5">
+  <title>NMAMIT Attendance Tracker | University Portal</title>
+  <meta name="description" content="Intelligent attendance tracker with interactive calendar, daily class timelines, subject-wise analytics, and 85% attendance bunk calculator.">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="NMAMIT Attendance">
+  <meta name="referrer" content="no-referrer">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="dark grid-pattern-bg">
+  <!-- Modern Tech Grid Pattern Background (Linear / Aceternity Style) -->
+  <div class="grid-pattern-fixed" aria-hidden="true"></div>
+  <div class="grid-ambient-glow" aria-hidden="true"></div>
+
+  <!-- Toast Notification Container (iOS Dynamic Capsule) -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- VIEW 1: AUTHENTICATION SCREEN -->
+  <main id="auth-view" class="auth-wrapper">
+    <div class="auth-card">
+      <!-- Portal Brand Header -->
+      <div class="auth-brand">
+        <h1 class="auth-title">
+          <span class="animated-gradient-text">
+            <span class="text-content">NMAMIT Attendance Tracker</span>
+          </span>
+        </h1>
+        <p class="auth-subtitle">Calibrated academic tracking, daily timetable & 85% buffer audit</p>
+      </div>
+
+      <!-- Login Form -->
+      <form id="login-form" class="login-form" autocomplete="on">
+        <!-- University Selection (Locked to NITTE) -->
+        <div class="form-group">
+          <label class="form-label">
+            <span>University / Institute</span>
+            <span class="captcha-badge-hint">NITTE University</span>
+          </label>
+          <div class="input-wrapper">
+            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 21h18M3 7v1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7H3l9-4 9 4v1"></path>
+              <path d="M4 21V11m16 10V11M8 14v7m4-7v7m4-7v7"></path>
+            </svg>
+            <input type="text" class="form-input" value="049 - NITTE (DEEMED TO BE UNIVERSITY)" readonly style="cursor: default; opacity: 0.95; padding-right: 14px;">
+            <input type="hidden" id="login-univ" name="univcode" value="049">
+          </div>
+        </div>
+
+        <!-- Mobile Number / USN -->
+        <div class="form-group">
+          <label for="login-regno" class="form-label">Registered Mobile / USN</label>
+          <div class="input-wrapper">
+            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            <input type="text" id="login-regno" name="regno" class="form-input" placeholder="e.g. 9876543210 or NNM24CS1234" required autocomplete="username">
+          </div>
+        </div>
+
+        <!-- Password -->
+        <div class="form-group">
+          <label for="login-password" class="form-label">Portal Password</label>
+          <div class="input-wrapper">
+            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            <input type="password" id="login-password" name="password" class="form-input" placeholder="••••••••" required autocomplete="current-password">
+            <button type="button" id="btn-toggle-pwd" class="input-action-btn" aria-label="Toggle password visibility">
+              <svg id="pwd-eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Captcha Row -->
+        <div class="form-group">
+          <div class="form-label-row">
+            <label for="login-captcha" class="form-label">Captcha Verification</label>
+            <span class="captcha-badge-hint">Live Sync</span>
+          </div>
+          <div class="captcha-control-row">
+            <div class="captcha-display-box" id="captcha-box" title="Click to refresh captcha">
+              <span id="captcha-code" class="captcha-text">------</span>
+              <button type="button" id="btn-refresh-captcha" class="captcha-refresh-btn" aria-label="Refresh captcha">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+              </button>
+            </div>
+            <div class="input-wrapper captcha-input-wrapper">
+              <input type="text" id="login-captcha" name="captcha" class="form-input" placeholder="Captcha" maxlength="6" required>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 6px;">
+          <button type="submit" id="btn-login-submit" class="btn-primary">
+            <span class="btn-text">Sign In & Fetch Attendance</span>
+            <span class="btn-spinner hidden"></span>
+          </button>
+
+          <button type="button" id="btn-demo-login" class="btn-secondary-glass">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            <span>Instant Demo Preview (NNM24CS1234)</span>
+          </button>
+        </div>
+      </form>
+
+      <!-- Portal Note & Developer Announcement Footer -->
+      <div class="auth-footer">
+        <!-- Minimalist Announcement Pill Badge -->
+        <div class="announcement-wrapper">
+          <button type="button" class="announcement-badge" id="btn-announcement" aria-haspopup="dialog" aria-expanded="false" title="Click to view developer LinkedIn profiles">
+            <span class="announcement-tag">Crafted By</span>
+            <span class="announcement-title">
+              <span>Sujal G S &amp; Lakshminarayanan P S</span>
+              <svg class="announcement-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="7" y1="17" x2="17" y2="7"></line>
+                <polyline points="7 7 17 7 17 17"></polyline>
+              </svg>
+            </span>
+          </button>
+        </div>
+
+        <p class="auth-subnote">🔒 Routed securely to <code>studentportal.universitysolutions.in</code></p>
+      </div>
+    </div>
+
+    <!-- Developer Credits Modal Dialog -->
+    <div id="dev-credits-modal" class="credits-modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="credits-modal-title">
+      <div class="credits-modal-backdrop" id="credits-modal-backdrop"></div>
+      <div class="credits-modal-card">
+        <div class="credits-modal-header">
+          <div>
+            <span class="section-tag">// DEVELOPERS</span>
+            <h3 id="credits-modal-title" class="credits-modal-title">Engineering Credits</h3>
+          </div>
+          <button type="button" id="btn-close-credits" class="credits-close-btn" aria-label="Close credits dialog">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+
+        <p class="credits-modal-description">
+          The attendance portal was designed &amp; developed by <strong>Sujal G S</strong> and <strong>Lakshminarayanan P S</strong>. Connect with us on LinkedIn:
+        </p>
+
+        <div class="credits-cards-grid">
+          <!-- Sujal G S Profile Option -->
+          <a href="https://www.linkedin.com/in/sujal-g-s/" target="_blank" rel="noopener noreferrer" class="creator-card">
+            <div class="creator-avatar">SG</div>
+            <div class="creator-info">
+              <div class="creator-name-row">
+                <span class="creator-name">Sujal G S</span>
+                <span class="creator-linkedin-tag">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+                  LinkedIn
+                  <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>
+                </span>
+              </div>
+              <span class="creator-handle">linkedin.com/in/sujal-g-s</span>
+            </div>
+          </a>
+
+          <!-- Lakshminarayanan P S Profile Option -->
+          <a href="https://www.linkedin.com/in/lakshminarayanan-p-s/" target="_blank" rel="noopener noreferrer" class="creator-card">
+            <div class="creator-avatar">LP</div>
+            <div class="creator-info">
+              <div class="creator-name-row">
+                <span class="creator-name">Lakshminarayanan P S</span>
+                <span class="creator-linkedin-tag">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+                  LinkedIn
+                  <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>
+                </span>
+              </div>
+              <span class="creator-handle">linkedin.com/in/lakshminarayanan-p-s</span>
+            </div>
+          </a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- VIEW 2: DASHBOARD SCREEN -->
+  <div id="dashboard-view" class="dashboard-wrapper hidden">
+    <!-- iOS Liquid Header -->
+    <header class="app-header">
+      <div class="header-top-bar">
+        <div class="header-left">
+          <div class="app-brand-mini">
+            <span class="app-title-mini">NMAMIT Attendance Tracker</span>
+            <span id="demo-indicator-pill" class="badge-demo hidden">DEMO</span>
+          </div>
+        </div>
+
+        <!-- Actions on the right: Wrapped + Sync + Install + Logout -->
+        <div class="header-right">
+          <!-- Offline Mode Indicator Badge -->
+          <span id="offline-indicator-badge" class="badge-offline hidden">
+            <span class="offline-dot"></span> Offline Mode
+          </span>
+
+          <!-- PWA Install Button (Shown on supported devices) -->
+          <button id="btn-pwa-install" class="icon-action-btn btn-pwa-pill hidden" title="Install Web App" aria-label="Install App">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span class="btn-label-desktop">Install</span>
+          </button>
+
+          <!-- Attendance Wrapped Story Generator Trigger -->
+          <button id="btn-open-wrapped" class="icon-action-btn btn-wrapped-pill" title="View Attendance Wrapped" aria-label="Attendance Wrapped">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+            </svg>
+            <span class="btn-label-desktop">Wrapped ✨</span>
+          </button>
+
+          <button id="btn-refresh-data" class="icon-action-btn" title="Refresh Attendance Data" aria-label="Refresh Attendance">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+            <span class="btn-label-desktop">Sync</span>
+          </button>
+
+          <button id="btn-logout" class="icon-action-btn btn-danger-subtle" title="Sign Out" aria-label="Sign Out">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+            <span class="btn-label-desktop">Logout</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Student Profile Chip in Header -->
+      <div class="header-profile-section">
+        <div class="student-profile-chip" id="student-chip">
+          <div class="avatar-ring">
+            <span id="student-avatar-initials">US</span>
+          </div>
+          <div class="profile-details">
+            <div class="student-name" id="profile-name">Student User</div>
+            <div class="student-sub">
+              <span id="profile-usn" class="usn-tag">NNM24CS1234</span>
+              <span class="dot-separator">•</span>
+              <span id="profile-degree" class="profile-degree-text">B.Tech</span>
+              <span class="dot-separator">•</span>
+              <span id="profile-dept" class="profile-dept-text">CSE</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="dashboard-body">
+      <!-- High-Visibility Feature Spotlight Ribbon (Attendance Wrapped & Install App) -->
+      <div class="feature-spotlight-bar" role="region" aria-label="Featured Tools">
+        <!-- Spotlight Card 1: Attendance Wrapped -->
+        <div class="spotlight-card spotlight-wrapped-card" id="spotlight-wrapped-card" role="button" tabindex="0" title="Click to view Attendance Wrapped story card">
+          <div class="spotlight-badge-row">
+            <span class="spotlight-chip chip-gold">
+              <span class="sparkle-anim">✨</span> VIRAL RECAP
+            </span>
+            <span class="spotlight-cta">View Story →</span>
+          </div>
+          <div class="spotlight-main">
+            <div class="spotlight-icon-ring ring-gold">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+              </svg>
+            </div>
+            <div class="spotlight-info">
+              <h3 class="spotlight-heading">Attendance Wrapped 2026</h3>
+              <p class="spotlight-text">Generate your Spotify-style 9:16 recap story card for WhatsApp &amp; Instagram</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Spotlight Card 2: Install Mobile App -->
+        <div class="spotlight-card spotlight-pwa-card" id="spotlight-pwa-card" role="button" tabindex="0" title="Click to install mobile app on your phone">
+          <div class="spotlight-badge-row">
+            <span class="spotlight-chip chip-emerald">
+              <span class="pulse-emerald"></span> OFFLINE PWA
+            </span>
+            <span class="spotlight-cta">Install App →</span>
+          </div>
+          <div class="spotlight-main">
+            <div class="spotlight-icon-ring ring-emerald">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="5" y="2" width="14" height="20" rx="3" ry="3"></rect>
+                <line x1="12" y1="18" x2="12.01" y2="18" stroke-width="3"></line>
+              </svg>
+            </div>
+            <div class="spotlight-info">
+              <h3 class="spotlight-heading">Install Mobile App</h3>
+              <p class="spotlight-text">Add to Home Screen for instant timetable access in zero-signal classrooms</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- iOS Segmented Navigation Tabs -->
+      <nav class="view-tabs" aria-label="Attendance Views">
+        <button class="tab-btn active" id="tab-btn-calendar" data-tab="tab-calendar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span class="tab-title">Calendar</span>
+          <span class="tab-badge" id="cal-tab-badge">Day Log</span>
+        </button>
+        <button class="tab-btn" id="tab-btn-summary" data-tab="tab-summary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="20" x2="18" y2="10"></line>
+            <line x1="12" y1="20" x2="12" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="14"></line>
+          </svg>
+          <span class="tab-title">Subject Planner</span>
+          <span class="tab-badge" id="summary-tab-badge">85% Goal</span>
+        </button>
+        <button class="tab-btn" id="tab-btn-heatmap" data-tab="tab-heatmap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+          <span class="tab-title">Activity Matrix</span>
+          <span class="tab-badge" id="heatmap-tab-badge">Streaks</span>
+        </button>
+      </nav>
+
+      <!-- TAB 1 CONTENT: CALENDAR & DAILY BREAKDOWN -->
+      <section id="tab-calendar" class="tab-content active">
+        <div class="calendar-layout-grid">
+          <!-- Left/Main: Month Calendar Liquid Card -->
+          <div class="calendar-card">
+            <!-- Calendar Navigation Header -->
+            <div class="calendar-header">
+              <div class="cal-title-wrapper">
+                <div class="section-tag">// CALENDAR LOG</div>
+                <h2 id="calendar-month-year" class="cal-month-title">September 2026</h2>
+                <div class="cal-legend">
+                  <span class="legend-item"><span class="dot dot-perfect"></span> Full (100%)</span>
+                  <span class="legend-item"><span class="dot dot-partial"></span> Partial</span>
+                  <span class="legend-item"><span class="dot dot-missed"></span> Missed All</span>
+                  <span class="legend-item"><span class="dot dot-off"></span> Holiday / None</span>
+                </div>
+              </div>
+
+              <div class="cal-controls">
+                <button id="cal-prev-btn" class="icon-btn" aria-label="Previous Month" title="Previous Month">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                  </svg>
+                </button>
+                <button id="cal-today-btn" class="btn-today">Today</button>
+                <button id="cal-next-btn" class="icon-btn" aria-label="Next Month" title="Next Month">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Month Quick Summary Counters -->
+            <div class="month-stats-strip">
+              <div class="mstat-item">
+                <span class="mstat-label">Classes Held</span>
+                <span class="mstat-value" id="mstat-conducted">0</span>
+              </div>
+              <div class="mstat-item">
+                <span class="mstat-label">Attended</span>
+                <span class="mstat-value text-emerald" id="mstat-attended">0</span>
+              </div>
+              <div class="mstat-item">
+                <span class="mstat-label">Missed</span>
+                <span class="mstat-value text-rose" id="mstat-missed">0</span>
+              </div>
+              <div class="mstat-item">
+                <span class="mstat-label">Monthly Rate</span>
+                <span class="mstat-value text-contrast" id="mstat-percentage">0.0%</span>
+              </div>
+            </div>
+
+            <!-- Calendar Days of Week Header -->
+            <div class="calendar-weekdays">
+              <div>Sun</div>
+              <div>Mon</div>
+              <div>Tue</div>
+              <div>Wed</div>
+              <div>Thu</div>
+              <div>Fri</div>
+              <div>Sat</div>
+            </div>
+
+            <!-- Days Grid -->
+            <div id="calendar-days-grid" class="calendar-grid">
+              <!-- Dynamically populated by calendar.js -->
+            </div>
+
+            <div class="calendar-footer-hint">
+              <span>💡 Tap any date cell above to inspect the period-by-period class timetable.</span>
+            </div>
+          </div>
+
+          <!-- Right/Side: Daily Period Details Panel -->
+          <div class="day-details-card" id="day-details-panel">
+            <div class="day-details-header">
+              <div>
+                <span class="section-tag">// TIMETABLE LOG</span>
+                <h3 id="selected-date-heading" class="selected-date-title">Select a Date</h3>
+                <p id="selected-date-dayname" class="selected-date-sub">Daily period breakdown</p>
+              </div>
+              <div class="day-status-pill" id="day-overall-badge">
+                <span>--</span>
+              </div>
+            </div>
+
+            <!-- Day metrics mini cards -->
+            <div class="day-metrics-row">
+              <div class="dmetric-box">
+                <span class="dm-label">Conducted</span>
+                <span class="dm-val" id="day-stat-conducted">-</span>
+              </div>
+              <div class="dmetric-box">
+                <span class="dm-label">Attended</span>
+                <span class="dm-val text-emerald" id="day-stat-attended">-</span>
+              </div>
+              <div class="dmetric-box">
+                <span class="dm-label">Missed</span>
+                <span class="dm-val text-rose" id="day-stat-missed">-</span>
+              </div>
+            </div>
+
+            <!-- Period Timetable List -->
+            <div class="periods-container">
+              <h4 class="periods-title">Period Breakdown</h4>
+              <div id="periods-list" class="periods-list">
+                <!-- Dynamically populated -->
+                <div class="empty-state">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                  </svg>
+                  <p>Tap on any date in the calendar to view which classes were attended or missed.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2 CONTENT: SUBJECT SUMMARY & 85% BUNK CALCULATOR -->
+      <section id="tab-summary" class="tab-content">
+        <!-- Low-Attendance Warning Radar ("Danger Zone") Container -->
+        <div id="danger-radar-container" class="danger-radar-wrapper hidden"></div>
+
+        <!-- Semester Aggregates Hero Banner -->
+        <div class="summary-hero-card">
+          <div class="hero-left">
+            <div class="aggregate-gauge-wrapper">
+              <svg class="radial-gauge" viewBox="0 0 120 120">
+                <circle class="gauge-bg" cx="60" cy="60" r="52"></circle>
+                <circle class="gauge-progress" id="aggregate-gauge-bar" cx="60" cy="60" r="52"></circle>
+              </svg>
+              <div class="gauge-inner-text">
+                <span id="overall-percentage" class="gauge-percentage">0.0%</span>
+                <span class="gauge-label">Aggregate</span>
+              </div>
+            </div>
+            <div class="hero-status-message">
+              <div class="status-chip" id="overall-status-chip">
+                <span class="chip-indicator"></span>
+                <span id="overall-status-text">Calculating...</span>
+              </div>
+              <h2 id="overall-headline" class="hero-headline">Loading metrics...</h2>
+              <p id="overall-subtext" class="hero-description">Analyzing your overall margin against the 85% attendance target.</p>
+            </div>
+          </div>
+
+          <div class="hero-right">
+            <!-- Aggregate Metrics Cards -->
+            <div class="aggregate-metric-box">
+              <span class="amb-label">Total Conducted</span>
+              <span class="amb-val" id="total-conducted">0</span>
+              <span class="amb-sub">Across all courses</span>
+            </div>
+            <div class="aggregate-metric-box">
+              <span class="amb-label">Total Attended</span>
+              <span class="amb-val text-emerald" id="total-attended">0</span>
+              <span class="amb-sub text-emerald">Classes verified</span>
+            </div>
+            <div class="aggregate-metric-box">
+              <span class="amb-label">Safe Bunk Buffer</span>
+              <span class="amb-val text-contrast" id="total-bunks-available">0</span>
+              <span class="amb-sub">Skips available at 85%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- What-If Bunk & Recovery Simulator Sandbox Card -->
+        <div class="simulator-card">
+          <div class="simulator-header">
+            <div class="sim-header-left">
+              <div class="section-tag">// WHAT-IF SANDBOX</div>
+              <h3 class="sim-title">Attendance & Bunk Simulator</h3>
+              <p class="sim-desc">Simulate attending future classes or taking planned leaves to see their exact percentage impact before bunking.</p>
+            </div>
+            <div class="sim-header-right">
+              <label for="sim-subject-select" class="form-label" style="margin-bottom: 4px;">Select Scope:</label>
+              <select id="sim-subject-select" class="form-input sim-select">
+                <option value="AGGREGATE">Overall College Aggregate</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="simulator-body">
+            <!-- Step Controls Grid -->
+            <div class="sim-controls-grid">
+              <!-- Stepper 1: Classes to Attend -->
+              <div class="sim-control-box box-attend">
+                <div class="sim-control-label">
+                  <span class="control-icon text-emerald">↑</span>
+                  <span>Classes to Attend</span>
+                </div>
+                <div class="sim-stepper">
+                  <button type="button" id="sim-btn-attend-minus" class="stepper-btn" aria-label="Decrease attended classes">−</button>
+                  <span id="sim-val-attend" class="stepper-val text-emerald">+0</span>
+                  <button type="button" id="sim-btn-attend-plus" class="stepper-btn" aria-label="Increase attended classes">+</button>
+                </div>
+                <span class="sim-control-hint">Consecutive boost attendances</span>
+              </div>
+
+              <!-- Stepper 2: Classes to Bunk -->
+              <div class="sim-control-box box-bunk">
+                <div class="sim-control-label">
+                  <span class="control-icon text-rose">↓</span>
+                  <span>Classes to Miss (Bunk)</span>
+                </div>
+                <div class="sim-stepper">
+                  <button type="button" id="sim-btn-bunk-minus" class="stepper-btn" aria-label="Decrease missed classes">−</button>
+                  <span id="sim-val-bunk" class="stepper-val text-rose">+0</span>
+                  <button type="button" id="sim-btn-bunk-plus" class="stepper-btn" aria-label="Increase missed classes">+</button>
+                </div>
+                <span class="sim-control-hint">Planned skips or leaves</span>
+              </div>
+
+              <!-- Projection Result Box -->
+              <div class="sim-result-box">
+                <div class="sim-result-row">
+                  <div>
+                    <span class="res-label">Current:</span>
+                    <span id="sim-current-pct" class="res-val-base">--%</span>
+                  </div>
+                  <span class="res-arrow">➔</span>
+                  <div>
+                    <span class="res-label">Projected:</span>
+                    <span id="sim-projected-pct" class="res-val-projected">--%</span>
+                  </div>
+                </div>
+                <div class="sim-result-badge-row">
+                  <span id="sim-delta-badge" class="sim-delta-badge delta-neutral">No Change (0.0%)</span>
+                  <span id="sim-buffer-status" class="sim-buffer-status status-safe">Safe Zone</span>
+                </div>
+                <p id="sim-advice-text" class="sim-advice-text">Adjust steppers above or choose a scenario below to project outcomes.</p>
+              </div>
+            </div>
+
+            <!-- Quick Presets -->
+            <div class="sim-presets-row">
+              <span class="presets-label">Scenarios:</span>
+              <div class="presets-pills">
+                <button type="button" class="sim-preset-btn" data-attend="0" data-bunk="4">Miss 1 Day (4h)</button>
+                <button type="button" class="sim-preset-btn" data-attend="0" data-bunk="10">Long Weekend (10h)</button>
+                <button type="button" class="sim-preset-btn" data-attend="0" data-bunk="20">Full Week Off (20h)</button>
+                <button type="button" class="sim-preset-btn" data-attend="15" data-bunk="0">1-Week Perfect (+15h)</button>
+                <button type="button" id="sim-btn-reset" class="sim-reset-btn">Reset</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Target Setting & Filter Toolbar -->
+        <div class="summary-toolbar">
+          <div class="target-selector-group">
+            <span class="toolbar-label">Attendance Target:</span>
+            <div class="target-pills" id="target-pill-group">
+              <button class="target-pill-btn" data-target="75">75% (Min)</button>
+              <button class="target-pill-btn" data-target="80">80%</button>
+              <button class="target-pill-btn active" data-target="85">85% (Optimal)</button>
+              <button class="target-pill-btn" data-target="90">90% (Distinction)</button>
+            </div>
+          </div>
+
+          <div class="search-filter-group">
+            <div class="input-wrapper search-wrapper">
+              <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input type="text" id="subject-search-input" class="form-input search-input" placeholder="Search course code or name...">
+            </div>
+          </div>
+        </div>
+
+        <!-- Subject Cards Grid -->
+        <div class="subjects-section-heading">
+          <h3>Course Breakdown & Bunk Planner</h3>
+          <span id="subject-count-badge" class="count-badge">0 Courses</span>
+        </div>
+
+        <div id="subjects-grid" class="subjects-grid">
+          <!-- Dynamically populated by summary.js -->
+        </div>
+      </section>
+
+      <!-- TAB 3 CONTENT: GITHUB-STYLE ATTENDANCE ACTIVITY MATRIX -->
+      <section id="tab-heatmap" class="tab-content">
+        <!-- Heatmap Container Card -->
+        <div class="heatmap-main-card">
+          <div class="heatmap-card-header">
+            <div class="hm-header-left">
+              <div class="section-tag">// ACTIVITY MATRIX</div>
+              <h2 class="heatmap-card-title">Attendance Heatmap</h2>
+              <p class="heatmap-card-subtitle">GitHub-style daily class attendance density. Hover or tap any cell to inspect schedule and attendances.</p>
+            </div>
+            <div class="hm-header-right">
+              <label for="heatmap-subject-filter" class="form-label" style="margin-bottom: 4px;">Filter Subject:</label>
+              <select id="heatmap-subject-filter" class="form-input heatmap-filter-select">
+                <option value="ALL">All Subjects Combined</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Heatmap Matrix Board -->
+          <div class="heatmap-board-wrapper">
+            <!-- Day of Week Row Labels -->
+            <div class="heatmap-days-column" aria-hidden="true">
+              <span>Mon</span>
+              <span>Tue</span>
+              <span>Wed</span>
+              <span>Thu</span>
+              <span>Fri</span>
+              <span>Sat</span>
+              <span>Sun</span>
+            </div>
+
+            <!-- Scrollable Grid Columns -->
+            <div class="heatmap-scroll-area">
+              <div id="heatmap-months-labels" class="heatmap-months-strip"></div>
+              <div id="heatmap-cells-grid" class="heatmap-cells-grid"></div>
+            </div>
+          </div>
+
+          <!-- Heatmap Legend -->
+          <div class="heatmap-legend-row">
+            <div class="heatmap-legend-left">
+              <span>💡 Click any cell to inspect detailed timetable in Calendar</span>
+            </div>
+            <div class="legend-scale-wrapper">
+              <span class="legend-title">Legend:</span>
+              <div class="legend-scale">
+                <span class="legend-scale-label">Less</span>
+                <div class="heatmap-cell level-0" title="Holiday / None"></div>
+                <div class="heatmap-cell level-1" title="Missed All (0%)"></div>
+                <div class="heatmap-cell level-2" title="Partial Bunk (<75%)"></div>
+                <div class="heatmap-cell level-3" title="Good (>=75%)"></div>
+                <div class="heatmap-cell level-4" title="100% Flawless"></div>
+                <span class="legend-scale-label">More</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Global Floating Heatmap Tooltip (Positioned outside scroll area to avoid clipping) -->
+        <div id="heatmap-tooltip" class="heatmap-tooltip hidden" role="tooltip"></div>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             BELOW-HEATMAP ANALYTICS PANELS
+        ════════════════════════════════════════════════════════════════════ -->
+
+        <!-- ROW 1: Smart Insights -->
+        <div class="hm-insights-row" id="hm-insights-row">
+          <div class="section-tag" style="margin-bottom: 14px; width: 100%;">// SMART INSIGHTS</div>
+          <div class="hm-insight-card" id="hm-insight-weakday">
+            <div class="hm-insight-icon">📅</div>
+            <div class="hm-insight-body">
+              <div class="hm-insight-label">Weakest Day</div>
+              <div class="hm-insight-value" id="hm-ins-weakday-val">—</div>
+              <div class="hm-insight-sub" id="hm-ins-weakday-sub">—</div>
+            </div>
+          </div>
+          <div class="hm-insight-card" id="hm-insight-bestsub">
+            <div class="hm-insight-icon">🏆</div>
+            <div class="hm-insight-body">
+              <div class="hm-insight-label">Best Subject</div>
+              <div class="hm-insight-value" id="hm-ins-bestsub-val">—</div>
+              <div class="hm-insight-sub" id="hm-ins-bestsub-sub">—</div>
+            </div>
+          </div>
+          <div class="hm-insight-card" id="hm-insight-risk">
+            <div class="hm-insight-icon">⚠️</div>
+            <div class="hm-insight-body">
+              <div class="hm-insight-label">Classes Missed</div>
+              <div class="hm-insight-value" id="hm-ins-missed-val">—</div>
+              <div class="hm-insight-sub" id="hm-ins-missed-sub">—</div>
+            </div>
+          </div>
+          <div class="hm-insight-card" id="hm-insight-streak">
+            <div class="hm-insight-icon">🔥</div>
+            <div class="hm-insight-body">
+              <div class="hm-insight-label">Longest Streak</div>
+              <div class="hm-insight-value" id="hm-ins-streak-val">—</div>
+              <div class="hm-insight-sub" id="hm-ins-streak-sub">—</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ROW 2: Day-of-Week DNA + Monthly Trend (side by side on desktop) -->
+        <div class="hm-two-col-row">
+
+          <!-- Day-of-Week Attendance DNA -->
+          <div class="hm-sub-card" id="hm-dayofweek-card">
+            <div class="hm-sub-card-header">
+              <div>
+                <div class="section-tag">// WEEKLY DNA</div>
+                <div class="hm-sub-card-title">Day-of-Week Pattern</div>
+                <div class="hm-sub-card-sub">Which day you attend best & worst</div>
+              </div>
+            </div>
+            <div class="hm-dow-chart" id="hm-dow-chart">
+              <!-- Rendered by JS -->
+            </div>
+          </div>
+
+          <!-- Monthly Trend -->
+          <div class="hm-sub-card" id="hm-monthly-card">
+            <div class="hm-sub-card-header">
+              <div>
+                <div class="section-tag">// TREND</div>
+                <div class="hm-sub-card-title">Month-over-Month Trend</div>
+                <div class="hm-sub-card-sub">Attendance % by calendar month</div>
+              </div>
+            </div>
+            <div class="hm-monthly-chart" id="hm-monthly-chart">
+              <!-- Rendered by JS -->
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ROW 3: Subject Leaderboard (full width) -->
+        <div class="hm-sub-card hm-leaderboard-card" id="hm-leaderboard-card">
+          <div class="hm-sub-card-header">
+            <div>
+              <div class="section-tag">// SUBJECT LEADERBOARD</div>
+              <div class="hm-sub-card-title">Subjects Ranked by Attendance</div>
+              <div class="hm-sub-card-sub">From highest to lowest — hover for class counts</div>
+            </div>
+          </div>
+          <div class="hm-leaderboard-list" id="hm-leaderboard-list">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+
+      </section>
+    </div>
+  </div>
+
+  <!-- ATTENDANCE WRAPPED STORY CARD MODAL -->
+  <div id="wrapped-modal" class="credits-modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="wrapped-modal-title">
+    <div class="credits-modal-backdrop" id="wrapped-modal-backdrop"></div>
+    <div class="wrapped-modal-card">
+      <div class="wrapped-modal-header">
+        <div>
+          <span class="section-tag">// SEMESTER RECAP</span>
+          <h3 id="wrapped-modal-title" class="wrapped-modal-title">Attendance Wrapped ✨</h3>
+        </div>
+        <button type="button" id="btn-close-wrapped" class="credits-close-btn" aria-label="Close wrapped dialog">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="wrapped-preview-container">
+        <canvas id="wrapped-canvas" class="wrapped-canvas"></canvas>
+      </div>
+
+      <div class="wrapped-actions-bar">
+        <button type="button" id="btn-download-wrapped" class="btn-primary">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span>Download Story Image (PNG)</span>
+        </button>
+        <button type="button" id="btn-copy-wrapped-text" class="btn-secondary-glass">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <span>Copy Stats Text</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PWA INSTALL GUIDANCE MODAL DIALOG -->
+  <div id="pwa-install-modal" class="credits-modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="pwa-modal-title">
+    <div class="credits-modal-backdrop" id="pwa-modal-backdrop"></div>
+    <div class="credits-modal-card pwa-guide-modal-card">
+      <div class="credits-modal-header">
+        <div>
+          <span class="section-tag">// MOBILE APP INSTALL</span>
+          <h3 id="pwa-modal-title" class="credits-modal-title">Install NMAMIT Tracker 📲</h3>
+        </div>
+        <button type="button" id="btn-close-pwa-modal" class="credits-close-btn" aria-label="Close dialog">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="pwa-guide-body">
+        <p class="pwa-guide-lead">Install NMAMIT Attendance Tracker as a native mobile app on your phone. No App Store needed!</p>
+
+        <div class="pwa-perks-row">
+          <span class="pwa-perk-pill">⚡ 1-Tap Home Screen Access</span>
+          <span class="pwa-perk-pill">📴 Works 100% Offline</span>
+          <span class="pwa-perk-pill">🚀 Full-Screen Native UI</span>
+        </div>
+
+        <div class="pwa-guide-platform ios-platform">
+          <div class="platform-header">
+            <span class="platform-icon">🍏</span>
+            <span class="platform-title">For iPhone / iPad (Safari)</span>
+          </div>
+          <div class="pwa-step-item">
+            <span class="step-num">1</span>
+            <span>Tap the <strong>Share</strong> button (square with arrow <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;vertical-align:middle;"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>) in Safari's bottom toolbar.</span>
+          </div>
+          <div class="pwa-step-item">
+            <span class="step-num">2</span>
+            <span>Scroll down and tap <strong>Add to Home Screen</strong>.</span>
+          </div>
+          <div class="pwa-step-item">
+            <span class="step-num">3</span>
+            <span>Tap <strong>Add</strong> in the top right corner. The NMAMIT icon will appear on your home screen!</span>
+          </div>
+        </div>
+
+        <div class="pwa-guide-platform android-platform">
+          <div class="platform-header">
+            <span class="platform-icon">🤖</span>
+            <span class="platform-title">For Android / Chrome</span>
+          </div>
+          <div class="pwa-step-item">
+            <span class="step-num">1</span>
+            <span>Tap the <strong>three dots (⋮)</strong> menu in Chrome's top-right corner.</span>
+          </div>
+          <div class="pwa-step-item">
+            <span class="step-num">2</span>
+            <span>Select <strong>Install app</strong> or <strong>Add to Home screen</strong>.</span>
+          </div>
+        </div>
+
+        <button type="button" id="btn-pwa-direct-install" class="btn-primary" style="width: 100%; margin-top: 14px; justify-content: center;">
+          <span>📲 Trigger Native Install Prompt</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/clickspark.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/calendar.js?v=6"></script>
+  <script src="js/summary.js?v=6"></script>
+  <script src="js/heatmap.js?v=6"></script>
+  <script src="js/simulator.js?v=6"></script>
+  <script src="js/wrapped.js?v=6"></script>
+  <script src="js/dropdown.js?v=6"></script>
+  <script src="js/app.js?v=6"></script>
+</body>
+</html>

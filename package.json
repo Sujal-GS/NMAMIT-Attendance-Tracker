@@ -1,0 +1,15 @@
+{
+  "name": "attendance-tracker",
+  "version": "1.0.0",
+  "description": "Modern, intuitive attendance tracker for university students",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "three": "^0.186.0"
+  }
+}
