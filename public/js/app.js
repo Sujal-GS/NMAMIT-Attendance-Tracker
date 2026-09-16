@@ -105,10 +105,14 @@ const App = {
     if (window.Simulator) Simulator.init();
     if (window.Wrapped) Wrapped.init();
 
-    // Initial render
-    CalendarView.render();
+    // Initial render: prioritize instant load of Summary and Calendar first
     SummaryView.load();
-    if (window.HeatmapView) HeatmapView.load();
+    CalendarView.render();
+    
+    // Background-load historical semester heatmap
+    setTimeout(() => {
+      if (window.HeatmapView) HeatmapView.load();
+    }, 150);
   },
 
   renderProfile() {

@@ -7,8 +7,8 @@ const app = express();
 const PORT = process.env.PORT || 3050;
 const PORTAL_BASE = 'https://studentportal.universitysolutions.in';
 
-// ── Restrict CORS: API is self-hosted, no cross-origin access needed ──
-app.use(cors({ origin: false, methods: ['GET', 'POST'], allowedHeaders: ['Content-Type', 'x-session-id'] }));
+// ── CORS Configuration ───────────────────────────────────────────────
+app.use(cors());
 
 // ── Security Headers ──────────────────────────────────────────────────
 app.use((req, res, next) => {
@@ -39,7 +39,7 @@ function isValidYearMonth(year, month) {
 
 // ── Login Rate Limiting (in-memory, per IP) ──────────────────────────
 const loginAttempts = new Map(); // ip -> { count, windowStart }
-const RATE_LIMIT_MAX = 15;
+const RATE_LIMIT_MAX = 20;
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 min
 
 function isLoginRateLimited(ip) {
@@ -59,15 +59,14 @@ function isLoginRateLimited(ip) {
 // In-memory session store: token -> { cookies, regno, univcode, studentInfo, isDemo, cache }
 const sessions = new Map();
 
-// Helper to make requests with proper headers and cookie handling
-async function portalFetch(endpoint, options = {}, session = null) {
+// Helper to make requests with proper headers, cookie handling, and automatic retries
+async function portalFetch(endpoint, options = {}, session = null, maxRetries = 2) {
   const url = endpoint.startsWith('http') ? endpoint : `${PORTAL_BASE}/${endpoint.replace(/^\//, '')}`;
   const headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Origin': PORTAL_BASE,
     'Referer': `${PORTAL_BASE}/index.html`,
     'X-Requested-With': 'XMLHttpRequest',
-    'Connection': 'close',
     ...(options.headers || {})
   };
 
@@ -79,29 +78,46 @@ async function portalFetch(endpoint, options = {}, session = null) {
     headers['Cookie'] = cookieStr;
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers
-  });
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout per attempt
 
-  // Extract set-cookie headers
-  if (session && response.headers.getSetCookie) {
-    const rawCookies = response.headers.getSetCookie();
-    rawCookies.forEach(c => {
-      const parts = c.split(';')[0].split('=');
-      if (parts.length >= 2) {
-        session.cookies[parts[0].trim()] = parts.slice(1).join('=').trim();
+      const response = await fetch(url, {
+        ...options,
+        headers,
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      // Extract set-cookie headers
+      if (session && response.headers.getSetCookie) {
+        const rawCookies = response.headers.getSetCookie();
+        rawCookies.forEach(c => {
+          const parts = c.split(';')[0].split('=');
+          if (parts.length >= 2) {
+            session.cookies[parts[0].trim()] = parts.slice(1).join('=').trim();
+          }
+        });
+      } else if (session && response.headers.get('set-cookie')) {
+        const cookieHeader = response.headers.get('set-cookie');
+        const parts = cookieHeader.split(';')[0].split('=');
+        if (parts.length >= 2) {
+          session.cookies[parts[0].trim()] = parts.slice(1).join('=').trim();
+        }
       }
-    });
-  } else if (session && response.headers.get('set-cookie')) {
-    const cookieHeader = response.headers.get('set-cookie');
-    const parts = cookieHeader.split(';')[0].split('=');
-    if (parts.length >= 2) {
-      session.cookies[parts[0].trim()] = parts.slice(1).join('=').trim();
+
+      return response;
+    } catch (err) {
+      if (attempt < maxRetries) {
+        // Wait before retrying (200ms, 400ms...)
+        await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)));
+        continue;
+      }
+      throw err;
     }
   }
-
-  return response;
 }
 
 // ── Cryptographically-secure session ID ─────────────────────────────
@@ -606,7 +622,7 @@ app.post('/api/attendance-month', authMiddleware, async (req, res) => {
   }
 
   // For live portal: fetch concurrently in small chunks to avoid overload
-  const chunkSize = 5;
+  const chunkSize = 3;
   for (let i = 0; i < dateList.length; i += chunkSize) {
     const chunk = dateList.slice(i, i + chunkSize);
     await Promise.all(chunk.map(async (dateStr) => {

@@ -182,9 +182,9 @@ const HeatmapView = {
       const currentYear = today.getFullYear();
       const currentMonth = today.getMonth() + 1; // 1-12
 
-      // Fetch the last 8 months of attendance (Feb to Sep, covers entire 32-week academic span)
+      // Prioritize the recent semester months first (from current month backwards)
       const monthsToFetch = [];
-      for (let i = 7; i >= 0; i--) {
+      for (let i = 0; i < 8; i++) {
         let m = currentMonth - i;
         let y = currentYear;
         if (m <= 0) {
@@ -194,28 +194,31 @@ const HeatmapView = {
         monthsToFetch.push({ year: y, month: m });
       }
 
-      // Fetch in chunks of 2 months to prevent overwhelming the university portal
-      const results = [];
+      this.semesterData.clear();
+
+      // Fetch in pairs of months and render progressively as data arrives
       for (let i = 0; i < monthsToFetch.length; i += 2) {
         const chunk = monthsToFetch.slice(i, i + 2);
         const chunkRes = await Promise.all(
           chunk.map(({ year, month }) => API.getMonthAttendance(year, month).catch(() => ({})))
         );
-        results.push(...chunkRes);
-      }
 
-      this.semesterData.clear();
-      results.forEach(res => {
-        if (res && res.success && res.monthData) {
-          for (const [dateStr, info] of Object.entries(res.monthData)) {
-            this.semesterData.set(dateStr, info);
+        let hasNewData = false;
+        chunkRes.forEach(res => {
+          if (res && res.success && res.monthData) {
+            for (const [dateStr, info] of Object.entries(res.monthData)) {
+              this.semesterData.set(dateStr, info);
+              hasNewData = true;
+            }
           }
-        }
-      });
+        });
 
-      this.populateSubjectFilter();
-      this.calculateStreaks();
-      this.render();
+        if (hasNewData) {
+          this.populateSubjectFilter();
+          this.calculateStreaks();
+          this.render();
+        }
+      }
     } catch (err) {
       console.warn('[HeatmapView] Error loading semester data:', err);
     }
