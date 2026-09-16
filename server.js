@@ -325,7 +325,7 @@ app.post('/api/login', async (req, res) => {
   }
 
   if (!regno || !passwd) {
-    return res.status(400).json({ success: false, message: 'Registration number / Mobile number and password are required.' });
+    return res.status(400).json({ success: false, message: 'Registered mobile number and password are required.' });
   }
 
   try {
