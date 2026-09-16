@@ -127,10 +127,19 @@ const CalendarView = {
       this.isLoadingMonth = true;
       const res = await API.getMonthAttendance(year, month);
       if (res && res.success && res.monthData) {
+        let totalConductedInMonth = 0;
+        for (const info of Object.values(res.monthData)) {
+          if (info && info.conducted > 0) totalConductedInMonth += info.conducted;
+        }
+
         this.monthDataCache.set(cacheKey, res.monthData);
-        try {
-          sessionStorage.setItem(`att_month_${cacheKey}`, JSON.stringify(res.monthData));
-        } catch (e) {}
+
+        // Only persist in sessionStorage if valid attendance records exist
+        if (totalConductedInMonth > 0) {
+          try {
+            sessionStorage.setItem(`att_month_${cacheKey}`, JSON.stringify(res.monthData));
+          } catch (e) {}
+        }
 
         // Prepopulate day caches
         for (const [dStr, dInfo] of Object.entries(res.monthData)) {

@@ -487,14 +487,37 @@ app.post('/api/login', async (req, res) => {
 });
 
 // Middleware to resolve active session (Supports stateless tokens across Vercel Lambdas)
+// Helper to detect expired/invalid university portal sessions
+function isPortalSessionExpired(data, rawText = '') {
+  if (!data && rawText) {
+    const lower = rawText.toLowerCase();
+    if (lower.includes('session expired') || lower.includes('signin.php') || lower.includes('please login') || lower.includes('invalid session') || lower.includes('session timeout')) {
+      return true;
+    }
+  }
+  if (data && typeof data === 'object') {
+    const code = parseInt(data.error_code, 10);
+    const msg = String(data.msg || data.message || '').toLowerCase();
+    if (code !== 0 && (code === -1 || code === -2 || code === 1 || code === 100 || msg.includes('session') || msg.includes('login') || msg.includes('auth') || msg.includes('expired') || msg.includes('invalid'))) {
+      return true;
+    }
+    if (code !== 0 && !Array.isArray(data.data)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Middleware to resolve active session (Supports stateless tokens across Vercel Lambdas)
 function authMiddleware(req, res, next) {
   const sessionId = req.headers['x-session-id'] || req.query.sessionId;
   if (!sessionId) {
-    return res.status(401).json({ success: false, message: 'Session missing. Please log in.' });
+    return res.status(401).json({ success: false, sessionExpired: true, message: 'Session missing. Please log in.' });
   }
 
   // 1. Check in-memory session
   if (sessions.has(sessionId)) {
+    req.sessionId = sessionId;
     req.userSession = sessions.get(sessionId);
     return next();
   }
@@ -508,15 +531,60 @@ function authMiddleware(req, res, next) {
       univcode: decrypted.univcode || '049',
       studentInfo: decrypted.studentInfo || null,
       isDemo: Boolean(decrypted.isDemo),
+      createdAt: decrypted.createdAt || Date.now(),
       cache: new Map()
     };
     sessions.set(sessionId, sessionObj);
+    req.sessionId = sessionId;
     req.userSession = sessionObj;
     return next();
   }
 
-  return res.status(401).json({ success: false, message: 'Session expired or invalid. Please log in.' });
+  return res.status(401).json({ success: false, sessionExpired: true, message: 'Session expired or invalid. Please log in.' });
 }
+
+// 3.5 Session Check & Liveness Verification
+app.get('/api/session-check', authMiddleware, async (req, res) => {
+  const session = req.userSession;
+  if (session.isDemo) {
+    return res.json({ success: true, valid: true, isDemo: true });
+  }
+
+  try {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const params = new URLSearchParams();
+    params.append('date', todayStr);
+
+    const checkResp = await portalFetch(
+      `app.php?a=viewAttendanceDetsummary&univcode=${session.univcode}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+        body: params.toString()
+      },
+      session,
+      5000
+    );
+
+    const checkText = await checkResp.text();
+    let checkData = null;
+    try { checkData = JSON.parse(checkText); } catch {}
+
+    if (isPortalSessionExpired(checkData, checkText)) {
+      if (req.sessionId) sessions.delete(req.sessionId);
+      return res.status(401).json({
+        success: false,
+        sessionExpired: true,
+        message: 'University portal session expired. Please sign in again.'
+      });
+    }
+
+    return res.json({ success: true, valid: true, isDemo: false });
+  } catch (err) {
+    // If portal is momentarily slow or network hiccups, permit soft pass
+    return res.json({ success: true, valid: true, warning: 'Liveness check soft pass' });
+  }
+});
 
 // 4. Student Info
 app.get('/api/student-info', authMiddleware, (req, res) => {
@@ -561,7 +629,8 @@ app.get('/api/attendance-summary', authMiddleware, async (req, res) => {
         },
         body: params.toString()
       },
-      session
+      session,
+      7000
     );
 
     const text = await resp.text();
@@ -569,7 +638,20 @@ app.get('/api/attendance-summary', authMiddleware, async (req, res) => {
     try {
       data = JSON.parse(text);
     } catch {
+      if (isPortalSessionExpired(null, text)) {
+        if (req.sessionId) sessions.delete(req.sessionId);
+        return res.status(401).json({ success: false, sessionExpired: true, message: 'University portal session expired. Please sign in again.' });
+      }
       return res.status(502).json({ success: false, message: 'Malformed JSON from portal: ' + text });
+    }
+
+    if (isPortalSessionExpired(data, text)) {
+      if (req.sessionId) sessions.delete(req.sessionId);
+      return res.status(401).json({
+        success: false,
+        sessionExpired: true,
+        message: (data && data.msg) || 'University portal session expired. Please sign in again.'
+      });
     }
 
     const rawList = (data.error_code === 0 && Array.isArray(data.data)) ? data.data : (Array.isArray(data.data) ? data.data : []);
@@ -653,7 +735,20 @@ app.post('/api/attendance-daily', authMiddleware, async (req, res) => {
     try {
       data = JSON.parse(text);
     } catch {
+      if (isPortalSessionExpired(null, text)) {
+        if (req.sessionId) sessions.delete(req.sessionId);
+        return res.status(401).json({ success: false, sessionExpired: true, message: 'University portal session expired. Please sign in again.' });
+      }
       return res.status(502).json({ success: false, message: 'Malformed JSON from portal: ' + text });
+    }
+
+    if (isPortalSessionExpired(data, text)) {
+      if (req.sessionId) sessions.delete(req.sessionId);
+      return res.status(401).json({
+        success: false,
+        sessionExpired: true,
+        message: (data && data.msg) || 'University portal session expired. Please sign in again.'
+      });
     }
 
     const classesList = (data.error_code === 0 && Array.isArray(data.data)) ? data.data : [];
@@ -728,10 +823,16 @@ app.post('/api/attendance-month', authMiddleware, async (req, res) => {
   }
 
   // Live Portal Fetch: Concurrency batch with per-request timeout guard
-  const batchSize = 8;
+  let portalSessionExpired = false;
+  let sessionExpiredMsg = '';
+
+  const batchSize = 6;
   for (let i = 0; i < activeDatesToFetch.length; i += batchSize) {
+    if (portalSessionExpired) break;
     const batch = activeDatesToFetch.slice(i, i + batchSize);
     await Promise.all(batch.map(async (dateStr) => {
+      if (portalSessionExpired) return;
+
       // Check in-memory cache
       if (session.cache && session.cache.has(dateStr)) {
         const classes = session.cache.get(dateStr);
@@ -757,12 +858,20 @@ app.post('/api/attendance-month', authMiddleware, async (req, res) => {
             body: params.toString()
           },
           session,
-          4000 // 4s timeout per day request
+          4500 // 4.5s timeout per day request
         );
 
         const text = await resp.text();
-        const data = JSON.parse(text);
-        const classes = (data.error_code === 0 && Array.isArray(data.data)) ? data.data : [];
+        let data = null;
+        try { data = JSON.parse(text); } catch {}
+
+        if (isPortalSessionExpired(data, text)) {
+          portalSessionExpired = true;
+          sessionExpiredMsg = (data && data.msg) || 'University portal session expired.';
+          return;
+        }
+
+        const classes = (data && data.error_code === 0 && Array.isArray(data.data)) ? data.data : [];
         if (session.cache) session.cache.set(dateStr, classes);
 
         const conducted = classes.reduce((sum, c) => sum + parseInt(c.fnoclass || '1', 10), 0);
@@ -772,10 +881,19 @@ app.post('/api/attendance-month', authMiddleware, async (req, res) => {
         }, 0);
         results[dateStr] = { conducted, attended, classes };
       } catch (e) {
-        // Fallback gracefully for this date to prevent whole month failing
+        // Fallback gracefully for this date
         results[dateStr] = { conducted: 0, attended: 0, classes: [], error: true };
       }
     }));
+  }
+
+  if (portalSessionExpired) {
+    if (req.sessionId) sessions.delete(req.sessionId);
+    return res.status(401).json({
+      success: false,
+      sessionExpired: true,
+      message: sessionExpiredMsg || 'University portal session expired. Please sign in again.'
+    });
   }
 
   res.json({ success: true, monthData: results });

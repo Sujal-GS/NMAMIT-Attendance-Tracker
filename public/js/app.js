@@ -72,13 +72,21 @@ const App = {
   // --------------------------------------------------------------------------
   async checkExistingSession() {
     if (API.sessionId) {
-      try {
-        this.showDashboard();
-        return;
-      } catch (err) {
-        console.warn('Existing session invalid:', err);
-        API.clearSession();
+      // If we have a saved session, show dashboard immediately for fast rendering
+      this.showDashboard();
+
+      // In the background, verify if the upstream portal session is still active
+      if (!API.isDemo) {
+        try {
+          const check = await API.checkSession();
+          if (!check || !check.success) {
+            console.warn('[App] Upstream session expired during verification');
+          }
+        } catch (err) {
+          console.warn('[App] Session check detected expired session:', err.message);
+        }
       }
+      return;
     }
 
     this.showAuth();

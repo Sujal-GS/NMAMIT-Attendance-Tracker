@@ -65,18 +65,37 @@ const API = {
         throw new Error('Invalid response format from server');
       }
 
-      if (resp.status === 401) {
+      if (resp.status === 401 || (data && data.sessionExpired === true)) {
         this.clearSession();
+
+        // Clear all cached months from sessionStorage so stale 0-class data never persists
+        try {
+          const keysToRemove = [];
+          for (let i = 0; i < sessionStorage.length; i++) {
+            const k = sessionStorage.key(i);
+            if (k && k.startsWith('att_month_')) keysToRemove.push(k);
+          }
+          keysToRemove.forEach(k => sessionStorage.removeItem(k));
+        } catch (e) {}
+
+        if (window.CalendarView) {
+          if (window.CalendarView.monthDataCache) window.CalendarView.monthDataCache.clear();
+          if (window.CalendarView.dayDataCache) window.CalendarView.dayDataCache.clear();
+        }
+        if (window.HeatmapView && window.HeatmapView.semesterData) {
+          window.HeatmapView.semesterData.clear();
+        }
+
         if (window.App && typeof window.App.showAuth === 'function') {
           window.App.showAuth();
           if (typeof window.App.showToast === 'function') {
-            window.App.showToast('Session expired. Please log in again.', 'error');
+            window.App.showToast('University portal session expired. Please sign in again to load live data.', 'error');
           }
           if (typeof window.App.refreshCaptcha === 'function') {
             window.App.refreshCaptcha();
           }
         }
-        throw new Error(data.message || 'Session expired. Please log in.');
+        throw new Error(data.message || 'University portal session expired. Please log in again.');
       }
 
       if (!resp.ok) {
@@ -87,6 +106,13 @@ const API = {
       console.error(`API Error [${endpoint}]:`, err.message || err);
       throw err;
     }
+  },
+
+  // Check if active session is still authenticated on portal
+  async checkSession() {
+    if (!this.sessionId) return { success: false, valid: false };
+    if (this.isDemo) return { success: true, valid: true };
+    return this.request('/api/session-check');
   },
 
   // 1. Fetch available universities
