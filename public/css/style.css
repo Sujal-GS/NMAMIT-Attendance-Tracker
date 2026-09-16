@@ -2856,11 +2856,12 @@ body::before {
    A2. FEATURE SPOTLIGHT BAR (ATTENDANCE WRAPPED & INSTALL APP)
    -------------------------------------------------------------------------- */
 .feature-spotlight-bar {
-  display: grid;
+  display: none;
   grid-template-columns: repeat(2, 1fr);
   gap: 14px;
   margin-bottom: 20px;
 }
+
 
 .feature-spotlight-bar.single-item {
   grid-template-columns: 1fr !important;
