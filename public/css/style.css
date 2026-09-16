@@ -2856,7 +2856,7 @@ body::before {
    A2. FEATURE SPOTLIGHT BAR (ATTENDANCE WRAPPED & INSTALL APP)
    -------------------------------------------------------------------------- */
 .feature-spotlight-bar {
-  display: none; /* Hidden on desktop screens since Install and Wrapped are in the top navigation header */
+  display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 14px;
   margin-bottom: 20px;
@@ -4407,14 +4407,18 @@ body::before {
     display: none !important;
   }
 
-  /* Hide duplicate header buttons on mobile: they are prominently showcased in the Spotlight Bar below */
-  .header-right .btn-pwa-pill,
+  /* Header action buttons on mobile */
   .header-right .btn-wrapped-pill {
-    display: none !important;
+    display: inline-flex !important;
   }
 
-  /* Feature Spotlight Bar Mobile */
+  .header-right .btn-pwa-pill {
+    display: inline-flex !important;
+  }
+
+  /* Feature Spotlight Bar Mobile (Stacked 1-column layout with high visibility) */
   .feature-spotlight-bar {
+    display: grid !important;
     grid-template-columns: 1fr !important;
     gap: 10px !important;
     margin-bottom: 16px !important;
