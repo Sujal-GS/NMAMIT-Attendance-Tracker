@@ -1,7 +1,16 @@
 /**
- * API Service for University Student Portal Proxy
- * Fully calibrated for Stateless Serverless (Vercel) & Localhost
+ * Global HTML Escaper for Context-Aware XSS Prevention
  */
+function escapeHtml(str) {
+  if (typeof str !== 'string') return str == null ? '' : String(str);
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+window.escapeHtml = escapeHtml;
 
 const API = {
   sessionId: localStorage.getItem('att_session_id') || null,

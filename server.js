@@ -64,6 +64,32 @@ function decryptCaptchaToken(token) {
   return decryptPayload('cap', token);
 }
 
+// Security Headers Middleware
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  next();
+});
+
+// Rate limiting state for login endpoint (15 attempts / 15 min per IP)
+const loginAttempts = new Map();
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const MAX_LOGIN_ATTEMPTS = 15;
+
+function checkLoginRateLimit(ip) {
+  const now = Date.now();
+  const timestamps = (loginAttempts.get(ip) || []).filter(t => now - t < RATE_LIMIT_WINDOW_MS);
+  if (timestamps.length >= MAX_LOGIN_ATTEMPTS) {
+    return false;
+  }
+  timestamps.push(now);
+  loginAttempts.set(ip, timestamps);
+  return true;
+}
+
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -321,6 +347,14 @@ app.post('/api/login', async (req, res) => {
       sessionId,
       studentInfo,
       isDemo: true
+    });
+  }
+
+  const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+  if (!checkLoginRateLimit(clientIp)) {
+    return res.status(429).json({
+      success: false,
+      message: 'Too many login attempts from this network. Please wait 15 minutes before trying again.'
     });
   }
 
