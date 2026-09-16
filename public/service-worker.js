@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nmamit-attendance-v4';
+const CACHE_NAME = 'nmamit-attendance-v5';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -40,12 +40,18 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch: Stale-While-Revalidate for Static Assets, Network-First for API
+// Fetch: Stale-While-Revalidate for Static Assets, Network-Only for dynamic Auth/Captcha, Network-First for API
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
   // Skip non-GET requests
   if (event.request.method !== 'GET') return;
+
+  // Never cache captcha or auth sensitive routes
+  if (url.pathname.startsWith('/api/captcha') || url.pathname.startsWith('/api/login')) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
 
   // For API endpoints, try network first, then fall back to cache
   if (url.pathname.startsWith('/api/')) {

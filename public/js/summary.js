@@ -131,10 +131,10 @@ const SummaryView = {
     const warningList = [];
 
     this.rawSubjects.forEach(s => {
-      const cond = parseInt(s.conducted || 0, 10);
-      const att = parseInt(s.attended || 0, 10);
+      const cond = parseInt(s.conducted ?? s.ftotalclass ?? 0, 10);
+      const att = parseInt(s.attended ?? s.fpresentclass ?? 0, 10);
       const pct = cond > 0 ? (att / cond) * 100 : 100;
-      const subName = s.fsubname || s.name || s.fsubcode || 'Subject';
+      const subName = s.fsubname || s.name || s.fsubcode || s.code || 'Subject';
 
       if (pct < 75) {
         const needed75 = Math.max(1, Math.ceil(((0.75 * cond) - att) / 0.25));
@@ -232,9 +232,10 @@ const SummaryView = {
     let aggAttended = 0;
 
     this.rawSubjects.forEach(s => {
-      const delta = this.simulatedDeltas.get(s.fsubcode) || { extraConducted: 0, extraAttended: 0 };
-      const cond = parseInt(s.conducted || 0, 10) + delta.extraConducted;
-      const att = parseInt(s.attended || 0, 10) + delta.extraAttended;
+      const subCode = s.fsubcode || s.code || '';
+      const delta = this.simulatedDeltas.get(subCode) || { extraConducted: 0, extraAttended: 0 };
+      const cond = parseInt(s.conducted ?? s.ftotalclass ?? 0, 10) + delta.extraConducted;
+      const att = parseInt(s.attended ?? s.fpresentclass ?? 0, 10) + delta.extraAttended;
       aggConducted += cond;
       aggAttended += att;
     });
@@ -324,8 +325,8 @@ const SummaryView = {
     if (!gridEl) return;
 
     const filtered = this.rawSubjects.filter(s => {
-      const cond = parseInt(s.conducted || 0, 10);
-      const att = parseInt(s.attended || 0, 10);
+      const cond = parseInt(s.conducted ?? s.ftotalclass ?? 0, 10);
+      const att = parseInt(s.attended ?? s.fpresentclass ?? 0, 10);
       const pct = cond > 0 ? (att / cond) * 100 : 100;
 
       if (this.showOnlyDanger && pct >= 85) {
@@ -333,8 +334,8 @@ const SummaryView = {
       }
 
       if (!this.searchQuery) return true;
-      const code = (s.fsubcode || '').toLowerCase();
-      const name = (s.fsubname || '').toLowerCase();
+      const code = (s.fsubcode || s.code || '').toLowerCase();
+      const name = (s.fsubname || s.name || '').toLowerCase();
       return code.includes(this.searchQuery) || name.includes(this.searchQuery);
     });
 
@@ -359,12 +360,12 @@ const SummaryView = {
 
     let cardsHtml = '';
     filtered.forEach(s => {
-      const code = s.fsubcode || 'N/A';
-      const name = s.fsubname || 'Course Name';
+      const code = s.fsubcode || s.code || 'N/A';
+      const name = s.fsubname || s.name || 'Course Name';
 
       const sim = this.simulatedDeltas.get(code) || { extraConducted: 0, extraAttended: 0 };
-      const baseCond = parseInt(s.conducted || 0, 10);
-      const baseAtt = parseInt(s.attended || 0, 10);
+      const baseCond = parseInt(s.conducted ?? s.ftotalclass ?? 0, 10);
+      const baseAtt = parseInt(s.attended ?? s.fpresentclass ?? 0, 10);
 
       const conducted = baseCond + sim.extraConducted;
       const attended = baseAtt + sim.extraAttended;

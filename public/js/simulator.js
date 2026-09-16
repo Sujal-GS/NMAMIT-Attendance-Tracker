@@ -108,14 +108,14 @@ const Simulator = {
 
     if (this.selectedSubCode === 'AGGREGATE') {
       subjects.forEach(s => {
-        baseConducted += parseInt(s.conducted || 0, 10);
-        baseAttended += parseInt(s.attended || 0, 10);
+        baseConducted += parseInt(s.conducted ?? s.ftotalclass ?? 0, 10);
+        baseAttended += parseInt(s.attended ?? s.fpresentclass ?? 0, 10);
       });
     } else {
       const found = subjects.find(s => (s.fsubcode || s.code) === this.selectedSubCode);
       if (found) {
-        baseConducted = parseInt(found.conducted || 0, 10);
-        baseAttended = parseInt(found.attended || 0, 10);
+        baseConducted = parseInt(found.conducted ?? found.ftotalclass ?? 0, 10);
+        baseAttended = parseInt(found.attended ?? found.fpresentclass ?? 0, 10);
       }
     }
 

@@ -172,7 +172,7 @@ const HeatmapView = {
       const currentYear = today.getFullYear();
       const currentMonth = today.getMonth() + 1; // 1-12
 
-      // Fetch the last 8 months of attendance (Feb to Sep, covers entire 32-week academic span)
+      // Check cache first across previous Calendar fetches and sessionStorage
       const monthsToFetch = [];
       for (let i = 7; i >= 0; i--) {
         let m = currentMonth - i;
@@ -181,25 +181,65 @@ const HeatmapView = {
           m += 12;
           y -= 1;
         }
-        monthsToFetch.push({ year: y, month: m });
-      }
+        const cacheKey = `${y}-${String(m).padStart(2, '0')}`;
+        let cached = window.CalendarView && window.CalendarView.monthDataCache ? window.CalendarView.monthDataCache.get(cacheKey) : null;
+        if (!cached) {
+          try {
+            const sessionCached = sessionStorage.getItem(`att_month_${cacheKey}`);
+            if (sessionCached) {
+              cached = JSON.parse(sessionCached);
+              if (window.CalendarView && window.CalendarView.monthDataCache) {
+                window.CalendarView.monthDataCache.set(cacheKey, cached);
+              }
+            }
+          } catch (e) {}
+        }
 
-      const results = await Promise.all(
-        monthsToFetch.map(({ year, month }) => API.getMonthAttendance(year, month).catch(() => ({})))
-      );
-
-      this.semesterData.clear();
-      results.forEach(res => {
-        if (res && res.success && res.monthData) {
-          for (const [dateStr, info] of Object.entries(res.monthData)) {
+        if (cached && typeof cached === 'object') {
+          for (const [dateStr, info] of Object.entries(cached)) {
             this.semesterData.set(dateStr, info);
           }
+        } else {
+          monthsToFetch.push({ year: y, month: m });
         }
-      });
+      }
 
+      // Render whatever cached data we already have immediately (0ms instant display)
       this.populateSubjectFilter();
       this.calculateStreaks();
       this.render();
+
+      if (monthsToFetch.length === 0) return;
+
+      // Fetch uncached months in small chunks (2 at a time) to prevent Vercel 10s timeouts & portal overload
+      const chunkSize = 2;
+      for (let i = 0; i < monthsToFetch.length; i += chunkSize) {
+        const chunk = monthsToFetch.slice(i, i + chunkSize);
+        const chunkResults = await Promise.all(
+          chunk.map(({ year, month }) => API.getMonthAttendance(year, month).catch(() => ({})))
+        );
+
+        chunkResults.forEach((res, idx) => {
+          if (res && res.success && res.monthData) {
+            const { year, month } = chunk[idx];
+            const cacheKey = `${year}-${String(month).padStart(2, '0')}`;
+            try {
+              sessionStorage.setItem(`att_month_${cacheKey}`, JSON.stringify(res.monthData));
+            } catch (e) {}
+            if (window.CalendarView && window.CalendarView.monthDataCache) {
+              window.CalendarView.monthDataCache.set(cacheKey, res.monthData);
+            }
+            for (const [dateStr, info] of Object.entries(res.monthData)) {
+              this.semesterData.set(dateStr, info);
+            }
+          }
+        });
+
+        // Progressive render as each batch loads
+        this.populateSubjectFilter();
+        this.calculateStreaks();
+        this.render();
+      }
     } catch (err) {
       console.warn('[HeatmapView] Error loading semester data:', err);
     }

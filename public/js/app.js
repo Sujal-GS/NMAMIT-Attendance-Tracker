@@ -105,10 +105,14 @@ const App = {
     if (window.Simulator) Simulator.init();
     if (window.Wrapped) Wrapped.init();
 
-    // Initial render
+    // Initial render: Load active tabs immediately
     CalendarView.render();
     SummaryView.load();
-    if (window.HeatmapView) HeatmapView.load();
+    
+    // Background load Heatmap without competing with initial view
+    if (window.HeatmapView) {
+      setTimeout(() => HeatmapView.load(), 300);
+    }
   },
 
   renderProfile() {
@@ -350,11 +354,23 @@ const App = {
         CalendarView.monthDataCache.clear();
         CalendarView.dayDataCache.clear();
         SummaryView.simulatedDeltas.clear();
+        
+        try {
+          const keysToRemove = [];
+          for (let i = 0; i < sessionStorage.length; i++) {
+            const k = sessionStorage.key(i);
+            if (k && k.startsWith('att_month_')) keysToRemove.push(k);
+          }
+          keysToRemove.forEach(k => sessionStorage.removeItem(k));
+        } catch (e) {}
+
         await Promise.all([
           CalendarView.render(),
-          SummaryView.load(),
-          window.HeatmapView ? HeatmapView.load() : Promise.resolve()
+          SummaryView.load()
         ]);
+        if (window.HeatmapView) {
+          HeatmapView.load();
+        }
         this.showToast('Attendance data synchronized!', 'success');
       });
     }

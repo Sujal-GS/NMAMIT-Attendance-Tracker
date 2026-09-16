@@ -1,11 +1,13 @@
 /**
  * API Service for University Student Portal Proxy
+ * Fully calibrated for Stateless Serverless (Vercel) & Localhost
  */
 
 const API = {
   sessionId: localStorage.getItem('att_session_id') || null,
   studentInfo: JSON.parse(localStorage.getItem('att_student_info') || 'null'),
   isDemo: localStorage.getItem('att_is_demo') === 'true',
+  captchaToken: localStorage.getItem('att_captcha_token') || null,
 
   // Store session in localStorage
   setSession(sessionId, studentInfo, isDemo = false) {
@@ -26,7 +28,7 @@ const API = {
     localStorage.removeItem('att_is_demo');
   },
 
-  // Helper request builder
+  // Helper request builder with robust non-JSON & 401 handling
   async request(endpoint, options = {}) {
     const headers = {
       'Content-Type': 'application/json',
@@ -43,13 +45,37 @@ const API = {
         headers
       });
 
-      const data = await resp.json();
+      const text = await resp.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (parseErr) {
+        if (!resp.ok) {
+          throw new Error(`Server returned error ${resp.status}: ${resp.statusText || 'Unable to complete request'}`);
+        }
+        throw new Error('Invalid response format from server');
+      }
+
+      if (resp.status === 401) {
+        this.clearSession();
+        if (window.App && typeof window.App.showAuth === 'function') {
+          window.App.showAuth();
+          if (typeof window.App.showToast === 'function') {
+            window.App.showToast('Session expired. Please log in again.', 'error');
+          }
+          if (typeof window.App.refreshCaptcha === 'function') {
+            window.App.refreshCaptcha();
+          }
+        }
+        throw new Error(data.message || 'Session expired. Please log in.');
+      }
+
       if (!resp.ok) {
         throw new Error(data.message || `Request failed with status ${resp.status}`);
       }
       return data;
     } catch (err) {
-      console.error(`API Error [${endpoint}]:`, err);
+      console.error(`API Error [${endpoint}]:`, err.message || err);
       throw err;
     }
   },
@@ -59,13 +85,12 @@ const API = {
     return this.request('/api/universities');
   },
 
-  captchaToken: null,
-
   // 2. Fetch captcha code
   async getCaptcha() {
     const res = await this.request('/api/captcha');
     if (res && res.captchaToken) {
       this.captchaToken = res.captchaToken;
+      localStorage.setItem('att_captcha_token', res.captchaToken);
     }
     return res;
   },
@@ -76,8 +101,8 @@ const API = {
       regno,
       passwd,
       captcha,
-      captchaToken: captchaToken || this.captchaToken,
-      univcode,
+      captchaToken: captchaToken || this.captchaToken || localStorage.getItem('att_captcha_token'),
+      univcode: univcode || '049',
       isDemo
     };
     const res = await this.request('/api/login', {
@@ -87,6 +112,8 @@ const API = {
 
     if (res.success && res.sessionId) {
       this.setSession(res.sessionId, res.studentInfo, res.isDemo);
+      localStorage.removeItem('att_captcha_token');
+      this.captchaToken = null;
     }
     return res;
   },

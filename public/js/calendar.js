@@ -106,14 +106,35 @@ const CalendarView = {
       return this.monthDataCache.get(cacheKey);
     }
 
+    // Check sessionStorage
+    try {
+      const sessionCached = sessionStorage.getItem(`att_month_${cacheKey}`);
+      if (sessionCached) {
+        const parsed = JSON.parse(sessionCached);
+        if (parsed && typeof parsed === 'object') {
+          this.monthDataCache.set(cacheKey, parsed);
+          for (const [dStr, dInfo] of Object.entries(parsed)) {
+            if (dInfo && dInfo.classes && dInfo.classes.length > 0) {
+              this.dayDataCache.set(dStr, dInfo.classes);
+            }
+          }
+          return parsed;
+        }
+      }
+    } catch (e) {}
+
     try {
       this.isLoadingMonth = true;
       const res = await API.getMonthAttendance(year, month);
-      if (res.success && res.monthData) {
+      if (res && res.success && res.monthData) {
         this.monthDataCache.set(cacheKey, res.monthData);
+        try {
+          sessionStorage.setItem(`att_month_${cacheKey}`, JSON.stringify(res.monthData));
+        } catch (e) {}
+
         // Prepopulate day caches
         for (const [dStr, dInfo] of Object.entries(res.monthData)) {
-          if (dInfo.classes && dInfo.classes.length > 0) {
+          if (dInfo && dInfo.classes && dInfo.classes.length > 0) {
             this.dayDataCache.set(dStr, dInfo.classes);
           }
         }

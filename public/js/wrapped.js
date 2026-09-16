@@ -90,15 +90,15 @@ const Wrapped = {
     let bestSubject = { name: 'None', pct: 0 };
 
     subjects.forEach(s => {
-      const cond = parseInt(s.conducted || 0, 10);
-      const att = parseInt(s.attended || 0, 10);
+      const cond = parseInt(s.conducted ?? s.ftotalclass ?? 0, 10);
+      const att = parseInt(s.attended ?? s.fpresentclass ?? 0, 10);
       totalConducted += cond;
       totalAttended += att;
 
       const pct = cond > 0 ? (att / cond) * 100 : 0;
       if (pct >= bestSubject.pct) {
         bestSubject = {
-          name: s.fsubname || s.name || s.fsubcode || 'Subject',
+          name: s.fsubname || s.name || s.fsubcode || s.code || 'Subject',
           pct: pct
         };
       }
