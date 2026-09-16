@@ -489,19 +489,36 @@ app.post('/api/login', async (req, res) => {
 // Middleware to resolve active session (Supports stateless tokens across Vercel Lambdas)
 // Helper to detect expired/invalid university portal sessions
 function isPortalSessionExpired(data, rawText = '') {
-  if (!data && rawText) {
+  if (rawText && typeof rawText === 'string') {
     const lower = rawText.toLowerCase();
-    if (lower.includes('session expired') || lower.includes('signin.php') || lower.includes('please login') || lower.includes('invalid session') || lower.includes('session timeout')) {
+    if (
+      lower.includes('session expired') ||
+      lower.includes('session timed out') ||
+      lower.includes('session timeout') ||
+      lower.includes('please login') ||
+      lower.includes('invalid session') ||
+      lower.includes('not logged in') ||
+      lower.includes('signin.php') ||
+      lower.includes('window.location="index.html"') ||
+      lower.includes('window.location=\'index.html\'')
+    ) {
       return true;
     }
   }
+
   if (data && typeof data === 'object') {
-    const code = parseInt(data.error_code, 10);
     const msg = String(data.msg || data.message || '').toLowerCase();
-    if (code !== 0 && (code === -1 || code === -2 || code === 1 || code === 100 || msg.includes('session') || msg.includes('login') || msg.includes('auth') || msg.includes('expired') || msg.includes('invalid'))) {
-      return true;
-    }
-    if (code !== 0 && !Array.isArray(data.data)) {
+    // Only flag as expired if message explicitly mentions session expiry / login required
+    if (
+      msg.includes('session expired') ||
+      msg.includes('session timed out') ||
+      msg.includes('session timeout') ||
+      msg.includes('please login') ||
+      msg.includes('invalid session') ||
+      msg.includes('not logged in') ||
+      msg.includes('session destroyed') ||
+      msg.includes('login again')
+    ) {
       return true;
     }
   }
@@ -544,46 +561,12 @@ function authMiddleware(req, res, next) {
 }
 
 // 3.5 Session Check & Liveness Verification
-app.get('/api/session-check', authMiddleware, async (req, res) => {
+app.get('/api/session-check', authMiddleware, (req, res) => {
   const session = req.userSession;
-  if (session.isDemo) {
-    return res.json({ success: true, valid: true, isDemo: true });
+  if (!session) {
+    return res.status(401).json({ success: false, sessionExpired: true, message: 'Session expired. Please log in.' });
   }
-
-  try {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const params = new URLSearchParams();
-    params.append('date', todayStr);
-
-    const checkResp = await portalFetch(
-      `app.php?a=viewAttendanceDetsummary&univcode=${session.univcode}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-        body: params.toString()
-      },
-      session,
-      5000
-    );
-
-    const checkText = await checkResp.text();
-    let checkData = null;
-    try { checkData = JSON.parse(checkText); } catch {}
-
-    if (isPortalSessionExpired(checkData, checkText)) {
-      if (req.sessionId) sessions.delete(req.sessionId);
-      return res.status(401).json({
-        success: false,
-        sessionExpired: true,
-        message: 'University portal session expired. Please sign in again.'
-      });
-    }
-
-    return res.json({ success: true, valid: true, isDemo: false });
-  } catch (err) {
-    // If portal is momentarily slow or network hiccups, permit soft pass
-    return res.json({ success: true, valid: true, warning: 'Liveness check soft pass' });
-  }
+  return res.json({ success: true, valid: true, isDemo: session.isDemo });
 });
 
 // 4. Student Info
