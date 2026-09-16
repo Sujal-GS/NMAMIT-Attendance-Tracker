@@ -265,6 +265,10 @@ const App = {
   async refreshCaptcha() {
     const codeEl = document.getElementById('captcha-code');
     const inputEl = document.getElementById('login-captcha');
+    const refreshBtn = document.getElementById('btn-refresh-captcha');
+    const refreshSvg = refreshBtn ? refreshBtn.querySelector('svg') : null;
+
+    if (refreshSvg) refreshSvg.classList.add('spinning');
     if (codeEl) codeEl.textContent = '...';
 
     try {
@@ -277,6 +281,10 @@ const App = {
       const fallback = Math.floor(100000 + Math.random() * 900000).toString();
       if (codeEl) codeEl.textContent = fallback;
       if (inputEl) inputEl.value = fallback;
+    } finally {
+      if (refreshSvg) {
+        setTimeout(() => refreshSvg.classList.remove('spinning'), 400);
+      }
     }
   },
 
@@ -360,6 +368,10 @@ const App = {
     const refreshBtn = document.getElementById('btn-refresh-data');
     if (refreshBtn) {
       refreshBtn.addEventListener('click', async () => {
+        const refreshIcon = refreshBtn.querySelector('svg');
+        if (refreshIcon) refreshIcon.classList.add('spinning');
+        refreshBtn.disabled = true;
+
         this.showToast('Syncing attendance data from portal...', 'info');
         CalendarView.monthDataCache.clear();
         CalendarView.dayDataCache.clear();
@@ -374,14 +386,21 @@ const App = {
           keysToRemove.forEach(k => sessionStorage.removeItem(k));
         } catch (e) {}
 
-        await Promise.all([
-          CalendarView.render(),
-          SummaryView.load()
-        ]);
-        if (window.HeatmapView) {
-          HeatmapView.load();
+        try {
+          await Promise.all([
+            CalendarView.render(),
+            SummaryView.load()
+          ]);
+          if (window.HeatmapView) {
+            HeatmapView.load();
+          }
+          this.showToast('Attendance data synchronized!', 'success');
+        } finally {
+          refreshBtn.disabled = false;
+          if (refreshIcon) {
+            setTimeout(() => refreshIcon.classList.remove('spinning'), 500);
+          }
         }
-        this.showToast('Attendance data synchronized!', 'success');
       });
     }
 
