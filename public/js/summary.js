@@ -354,12 +354,10 @@ const SummaryView = {
             </div>
             <div class="progress-stats-line">
               <span class="stat-pill-attended">Attended: <strong>${attended}</strong> / ${conducted}</span>
-              <button type="button" class="stat-pill-missed ${missed > 0 ? 'has-absences' : 'zero-absences'}" 
-                onclick="SummaryView.showAbsentDates('${code}', '${encodeURIComponent(name)}', ${missed})"
-                title="${missed > 0 ? `Click to view all ${missed} absent dates for this subject` : '100% Attendance in this course'}">
-                <span>Missed: <strong>${missed}</strong> class${missed !== 1 ? 'es' : ''}</span>
-                ${missed > 0 ? '<span class="absent-pill-tag">View Dates &rarr;</span>' : '<span class="absent-pill-tag tag-perfect">✓ 100%</span>'}
-              </button>
+              <span class="${missed > 0 ? 'text-missed-link' : ''}" 
+                ${missed > 0 ? `onclick="SummaryView.showAbsentDates('${code}', '${encodeURIComponent(name)}', ${missed})" title="Click to view absent dates"` : ''}>
+                Missed: <strong>${missed}</strong> class${missed !== 1 ? 'es' : ''}
+              </span>
             </div>
           </div>
 
@@ -378,6 +376,19 @@ const SummaryView = {
               ${hasSimulation ? `Sim: +${sim.extraAttended} att / +${sim.extraConducted} total` : 'What-If Simulator'}
             </span>
             <div class="sim-actions">
+              ${missed > 0 ? `
+              <button type="button" class="sim-btn sim-btn-absent" 
+                onclick="SummaryView.showAbsentDates('${code}', '${encodeURIComponent(name)}', ${missed})" 
+                title="View all ${missed} absent date${missed > 1 ? 's' : ''} for this course">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                  <line x1="16" y1="2" x2="16" y2="6"></line>
+                  <line x1="8" y1="2" x2="8" y2="6"></line>
+                  <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+                <span>Dates (${missed})</span>
+              </button>
+              ` : ''}
               <button class="sim-btn" onclick="SummaryView.simulate('${code}', 1, 1)" title="Simulate attending next class">+1 Attend</button>
               <button class="sim-btn sim-btn-danger" onclick="SummaryView.simulate('${code}', 1, 0)" title="Simulate skipping next class">+1 Miss</button>
               ${hasSimulation ? `<button class="sim-reset-btn" onclick="SummaryView.resetSimulation('${code}')">Reset</button>` : ''}

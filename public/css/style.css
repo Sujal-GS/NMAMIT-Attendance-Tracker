@@ -2787,6 +2787,33 @@ body::before {
   color: var(--rose);
 }
 
+.sim-btn-absent {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-color: rgba(244, 63, 94, 0.28);
+  background: rgba(244, 63, 94, 0.08);
+  color: #fb7185;
+}
+
+.sim-btn-absent:hover {
+  background: rgba(244, 63, 94, 0.18);
+  border-color: rgba(244, 63, 94, 0.5);
+  color: #fda4af;
+  box-shadow: 0 0 10px rgba(244, 63, 94, 0.2);
+}
+
+.text-missed-link {
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.text-missed-link:hover {
+  color: var(--rose);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .sim-reset-btn {
   padding: 4px 8px;
   font-size: 0.675rem;
