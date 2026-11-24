@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=9">
+  <link rel="stylesheet" href="css/style.css?v=10">
 
   <!-- Vercel Web Analytics & Speed Insights -->
   <script>
@@ -826,10 +826,6 @@
               </svg>
             </div>
             <div class="hero-status-message">
-              <div class="status-chip safe" id="ia-status-chip">
-                <span class="chip-indicator"></span>
-                <span id="ia-status-text">Official Examination Records</span>
-              </div>
               <h2 id="ia-headline" class="hero-headline">Continuous Internal Evaluation (CIE)</h2>
               <p id="ia-subtext" class="hero-description">Official Mid-Semester Exams, Lab Assessments, and Course Work evaluations published by the university.</p>
             </div>
@@ -854,21 +850,19 @@
           </div>
         </div>
 
-        <!-- Controls / Toolbar -->
-        <div class="subjects-toolbar">
-          <div class="toolbar-left">
-            <h3 class="section-title">Official CIE Marks Sheet</h3>
+        <!-- Section Header with Count & Refresh -->
+        <div class="subjects-section-heading">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <h3>Official CIE Marks Sheet</h3>
             <span class="count-badge" id="ia-subjects-count-badge">0 Subjects</span>
           </div>
-          <div class="toolbar-right">
-            <button type="button" id="btn-refresh-ia" class="icon-action-btn" title="Reload IA Marks from Portal">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="23 4 23 10 17 10"></polyline>
-                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-              </svg>
-              <span class="btn-label-desktop">Refresh Marks</span>
-            </button>
-          </div>
+          <button type="button" id="btn-refresh-ia" class="icon-action-btn" title="Reload IA Marks from Portal">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+            <span class="btn-label-desktop">Refresh Marks</span>
+          </button>
         </div>
 
         <!-- Glassmorphic Official CIE Table Card -->
@@ -1023,7 +1017,7 @@
   <script src="js/api.js"></script>
   <script src="js/calendar.js"></script>
   <script src="js/summary.js?v=7"></script>
-  <script src="js/iamarks.js?v=9"></script>
+  <script src="js/iamarks.js?v=10"></script>
   <script src="js/heatmap.js?v=6"></script>
   <script src="js/simulator.js?v=6"></script>
   <script src="js/wrapped.js?v=6"></script>
