@@ -7,17 +7,29 @@ const app = express();
 const PORT = process.env.PORT || 3050;
 const PORTAL_BASE = 'https://studentportal.universitysolutions.in';
 
-// Encryption setup for stateless serverless sessions across Vercel Lambda instances
+// -----------------------------------------------------------------------------
+// 1. Production Secrets & Stateless Session Encryption (AES-256-GCM)
+// -----------------------------------------------------------------------------
+if (!process.env.SESSION_SECRET && process.env.NODE_ENV === 'production') {
+  console.warn('⚠️ [SECURITY WARNING] SESSION_SECRET is not set in production. Using fallback secret.');
+}
 const SESSION_SECRET = process.env.SESSION_SECRET || 'nmamit_attendance_secret_key_2026_x9k2p_nitte';
 const ENCRYPTION_KEY = crypto.createHash('sha256').update(SESSION_SECRET).digest();
 const ALGORITHM = 'aes-256-gcm';
+
+// Token lifetimes
+const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days max lifetime
+const CAPTCHA_MAX_AGE_MS = 15 * 60 * 1000;           // 15 minutes max lifetime
 
 function encryptPayload(prefix, payload) {
   try {
     const iv = crypto.randomBytes(12);
     const cipher = crypto.createCipheriv(ALGORITHM, ENCRYPTION_KEY, iv);
-    const data = JSON.stringify(payload);
-    let encrypted = cipher.update(data, 'utf8', 'base64');
+    const dataWithTs = JSON.stringify({
+      ...payload,
+      _t: Date.now()
+    });
+    let encrypted = cipher.update(dataWithTs, 'utf8', 'base64');
     encrypted += cipher.final('base64');
     const authTag = cipher.getAuthTag().toString('base64');
     return `${prefix}_${iv.toString('base64')}.${authTag}.${encrypted}`;
@@ -27,7 +39,7 @@ function encryptPayload(prefix, payload) {
   }
 }
 
-function decryptPayload(prefix, token) {
+function decryptPayload(prefix, token, maxAgeMs = null) {
   try {
     if (!token || typeof token !== 'string') return null;
     const tokenPrefix = `${prefix}_`;
@@ -42,7 +54,15 @@ function decryptPayload(prefix, token) {
     decipher.setAuthTag(authTag);
     let decrypted = decipher.update(encrypted, 'base64', 'utf8');
     decrypted += decipher.final('utf8');
-    return JSON.parse(decrypted);
+    const parsed = JSON.parse(decrypted);
+
+    // Enforce cryptographic token expiration
+    if (maxAgeMs && parsed._t) {
+      if (Date.now() - parsed._t > maxAgeMs) {
+        return null; // Token expired
+      }
+    }
+    return parsed;
   } catch (err) {
     return null;
   }
@@ -53,7 +73,7 @@ function encryptSession(payload) {
 }
 
 function decryptSession(token) {
-  return decryptPayload('sess', token);
+  return decryptPayload('sess', token, SESSION_MAX_AGE_MS);
 }
 
 function encryptCaptchaToken(payload) {
@@ -61,43 +81,182 @@ function encryptCaptchaToken(payload) {
 }
 
 function decryptCaptchaToken(token) {
-  return decryptPayload('cap', token);
+  return decryptPayload('cap', token, CAPTCHA_MAX_AGE_MS);
 }
 
-// Security Headers Middleware
+// -----------------------------------------------------------------------------
+// 2. HTTP Security Headers (Defense in Depth)
+// -----------------------------------------------------------------------------
+app.disable('x-powered-by');
+
 app.use((req, res, next) => {
+  // Prevent MIME-sniffing
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  // Prevent clickjacking via iframes
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  // Referrer privacy
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  // Disable unused browser hardware APIs
   res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  // Legacy XSS filter protection
   res.setHeader('X-XSS-Protection', '1; mode=block');
+  // Isolation policies
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+
+  // Enforce HSTS on production domains
+  if (process.env.NODE_ENV === 'production' || req.headers['x-forwarded-proto'] === 'https') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  }
+
+  // Strict Content-Security-Policy
+  res.setHeader(
+    'Content-Security-Policy',
+    [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://va.vercel-scripts.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com data:",
+      "img-src 'self' data: blob: https:",
+      "connect-src 'self' https://studentportal.universitysolutions.in https://vitals.vercel-insights.com https://va.vercel-scripts.com",
+      "frame-ancestors 'self'",
+      "base-uri 'self'",
+      "form-action 'self'"
+    ].join('; ')
+  );
+
   next();
 });
 
-// Rate limiting state for login endpoint (15 attempts / 15 min per IP)
-const loginAttempts = new Map();
-const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
-const MAX_LOGIN_ATTEMPTS = 15;
+// -----------------------------------------------------------------------------
+// 3. CORS Configuration (Restricted Origin Whitelist)
+// -----------------------------------------------------------------------------
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3050',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:3050',
+  'http://127.0.0.1:5173'
+];
 
-function checkLoginRateLimit(ip) {
+if (process.env.ALLOWED_ORIGINS) {
+  process.env.ALLOWED_ORIGINS.split(',').forEach(o => {
+    const trimmed = o.trim();
+    if (trimmed) allowedOrigins.push(trimmed);
+  });
+}
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, server-to-server, same-origin)
+    if (!origin) return callback(null, true);
+
+    // Allow localhost/127.0.0.1 development
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      return callback(null, true);
+    }
+
+    // Allow Vercel preview & production deployments (*.vercel.app)
+    if (/^https:\/\/.*\.vercel\.app$/.test(origin)) {
+      return callback(null, true);
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error('Cross-Origin Request Blocked by Security Policy'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'x-session-id', 'Authorization']
+};
+
+app.use(cors(corsOptions));
+
+// -----------------------------------------------------------------------------
+// 4. Rate Limiting Middleware (Sliding Window Memory-Bounded)
+// -----------------------------------------------------------------------------
+const rateLimits = new Map();
+
+function checkRateLimit(key, maxRequests, windowMs) {
   const now = Date.now();
-  const timestamps = (loginAttempts.get(ip) || []).filter(t => now - t < RATE_LIMIT_WINDOW_MS);
-  if (timestamps.length >= MAX_LOGIN_ATTEMPTS) {
+  const bucket = (rateLimits.get(key) || []).filter(t => now - t < windowMs);
+  if (bucket.length >= maxRequests) {
     return false;
   }
-  timestamps.push(now);
-  loginAttempts.set(ip, timestamps);
+  bucket.push(now);
+  rateLimits.set(key, bucket);
   return true;
 }
 
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Login rate limiting (15 attempts / 15 min per IP)
+function loginRateLimitMiddleware(req, res, next) {
+  const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+  if (!checkRateLimit(`login_${ip}`, 15, 15 * 60 * 1000)) {
+    return res.status(429).json({
+      success: false,
+      message: 'Too many login attempts. Please wait 15 minutes before trying again.'
+    });
+  }
+  next();
+}
+
+// Captcha rate limiting (30 attempts / 5 min per IP)
+function captchaRateLimitMiddleware(req, res, next) {
+  const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+  if (!checkRateLimit(`captcha_${ip}`, 30, 5 * 60 * 1000)) {
+    return res.status(429).json({
+      success: false,
+      message: 'Too many captcha requests. Please wait a moment.'
+    });
+  }
+  next();
+}
+
+// General API rate limiting (120 requests / 1 min per IP)
+app.use('/api/', (req, res, next) => {
+  const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+  if (!checkRateLimit(`api_${ip}`, 120, 60 * 1000)) {
+    return res.status(429).json({
+      success: false,
+      message: 'Rate limit exceeded. Please slow down your requests.'
+    });
+  }
+  next();
+});
+
+// -----------------------------------------------------------------------------
+// 5. Payload Limits & Safe Body Parsing
+// -----------------------------------------------------------------------------
+app.use(express.json({ limit: '15kb' }));
+app.use(express.urlencoded({ extended: true, limit: '15kb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // In-memory session caches for warm containers / local dev
 const sessions = new Map();
 const preAuthSessions = new Map();
+
+// Periodic prune interval to prevent memory growth (every 10 minutes)
+setInterval(() => {
+  const now = Date.now();
+  const sessionCutoff = now - 24 * 60 * 60 * 1000; // 24 hours
+  const preAuthCutoff = now - 15 * 60 * 1000;      // 15 mins
+  const rateLimitCutoff = now - 15 * 60 * 1000;
+
+  for (const [k, v] of sessions.entries()) {
+    if (v.createdAt && v.createdAt < sessionCutoff) sessions.delete(k);
+  }
+  for (const [k, v] of preAuthSessions.entries()) {
+    if (v.createdAt && v.createdAt < preAuthCutoff) preAuthSessions.delete(k);
+  }
+  for (const [k, timestamps] of rateLimits.entries()) {
+    const filtered = timestamps.filter(t => now - t < rateLimitCutoff);
+    if (filtered.length === 0) rateLimits.delete(k);
+    else rateLimits.set(k, filtered);
+  }
+}, 10 * 60 * 1000);
 
 // Helper to extract cookies across all Node runtimes
 function extractCookies(response, session) {
@@ -133,9 +292,21 @@ function extractCookies(response, session) {
   }
 }
 
-// Helper to make requests with proper headers and cookie handling
+// -----------------------------------------------------------------------------
+// 6. Hardened Portal Request Bridge (SSRF-Protected)
+// -----------------------------------------------------------------------------
 async function portalFetch(endpoint, options = {}, session = null, timeoutMs = 8000) {
-  const url = endpoint.startsWith('http') ? endpoint : `${PORTAL_BASE}/${endpoint.replace(/^\//, '')}`;
+  // Ensure endpoint strictly resolves to PORTAL_BASE (SSRF Protection)
+  let cleanEndpoint = endpoint.replace(/^\/+/, '');
+  if (cleanEndpoint.startsWith('http://') || cleanEndpoint.startsWith('https://')) {
+    const parsed = new URL(cleanEndpoint);
+    if (parsed.origin !== PORTAL_BASE) {
+      throw new Error('Forbidden outbound request: Origin restricted to official university portal.');
+    }
+    cleanEndpoint = parsed.pathname.replace(/^\/+/, '') + parsed.search;
+  }
+
+  const url = `${PORTAL_BASE}/${cleanEndpoint}`;
   const headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Origin': PORTAL_BASE,
@@ -273,8 +444,8 @@ app.get('/api/universities', async (req, res) => {
   }
 });
 
-// 2. Fetch Captcha with synchronized session cookie
-app.get('/api/captcha', async (req, res) => {
+// 2. Fetch Captcha with synchronized session cookie (Rate-limited & Monitored)
+app.get('/api/captcha', captchaRateLimitMiddleware, async (req, res) => {
   try {
     const sessionObj = { cookies: {} };
     const resp = await portalFetch('get_captcha.php', { method: 'GET' }, sessionObj);
@@ -286,12 +457,12 @@ app.get('/api/captcha', async (req, res) => {
       data = { captcha: Math.floor(100000 + Math.random() * 900000).toString() };
     }
 
-    const captchaVal = data.captcha || '839201';
+    const captchaVal = (data && data.captcha) ? String(data.captcha).slice(0, 10) : '839201';
     const captchaToken = encryptCaptchaToken({
       cookies: sessionObj.cookies,
       captcha: captchaVal,
       createdAt: Date.now()
-    }) || ('cap_' + Math.random().toString(36).substring(2));
+    }) || ('cap_' + crypto.randomBytes(16).toString('hex'));
 
     preAuthSessions.set(captchaToken, {
       cookies: sessionObj.cookies,
@@ -299,31 +470,29 @@ app.get('/api/captcha', async (req, res) => {
       createdAt: Date.now()
     });
 
-    // Cleanup expired pre-auth sessions (> 15 mins)
-    const expiryCutoff = Date.now() - 15 * 60 * 1000;
-    for (const [k, v] of preAuthSessions.entries()) {
-      if (v.createdAt < expiryCutoff) preAuthSessions.delete(k);
-    }
-
     res.json({
       success: true,
       captcha: captchaVal,
       captchaToken
     });
   } catch (err) {
-    console.error('Captcha fetch error:', err.message);
-    const randomCaptcha = Math.floor(100000 + Math.random() * 900000).toString();
-    res.json({ success: true, captcha: randomCaptcha, captchaToken: '' });
+    console.error('[Security] Captcha fetch error:', err.message);
+    const fallbackCaptcha = Math.floor(100000 + Math.random() * 900000).toString();
+    res.json({ success: true, captcha: fallbackCaptcha, captchaToken: '' });
   }
 });
 
-// 3. Login
-app.post('/api/login', async (req, res) => {
+// 3. Login Endpoint (Hardened with strict validation, Rate Limiting, and URLSearchParams)
+app.post('/api/login', loginRateLimitMiddleware, async (req, res) => {
   const { regno, passwd, captcha, captchaToken, univcode = '049', isDemo } = req.body;
 
+  // Validate Demo Login
   if (isDemo) {
+    const demoRegno = typeof regno === 'string' && regno.trim() ? regno.trim().slice(0, 30) : 'NNM24CS1234';
+    const cleanUniv = typeof univcode === 'string' && /^[a-zA-Z0-9_-]{1,10}$/.test(univcode.trim()) ? univcode.trim() : '049';
+
     const studentInfo = {
-      fregno: regno || 'NNM24CS1234',
+      fregno: demoRegno,
       fname: 'Rohit Shenoy',
       fdegree: 'B.Tech',
       fdescpn: 'Computer Science & Engineering',
@@ -332,14 +501,14 @@ app.post('/api/login', async (req, res) => {
 
     const sessionPayload = {
       cookies: {},
-      regno: regno || 'NNM24CS1234',
-      univcode: univcode || '049',
+      regno: demoRegno,
+      univcode: cleanUniv,
       studentInfo,
       isDemo: true,
       createdAt: Date.now()
     };
 
-    const sessionId = encryptSession(sessionPayload) || ('sess_' + Date.now());
+    const sessionId = encryptSession(sessionPayload) || ('sess_' + crypto.randomBytes(16).toString('hex'));
     sessions.set(sessionId, { ...sessionPayload, cache: new Map() });
 
     return res.json({
@@ -350,32 +519,39 @@ app.post('/api/login', async (req, res) => {
     });
   }
 
-  const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
-  if (!checkLoginRateLimit(clientIp)) {
-    return res.status(429).json({
+  // Strict Input Validation & Type Checking
+  if (!regno || typeof regno !== 'string' || !passwd || typeof passwd !== 'string') {
+    return res.status(400).json({
       success: false,
-      message: 'Too many login attempts from this network. Please wait 15 minutes before trying again.'
+      message: 'Valid registered mobile number and password are required.'
     });
   }
 
-  if (!regno || !passwd) {
-    return res.status(400).json({ success: false, message: 'Registered mobile number and password are required.' });
+  const cleanRegno = regno.trim();
+  const cleanPasswd = passwd;
+  const cleanUniv = typeof univcode === 'string' && /^[a-zA-Z0-9_-]{1,10}$/.test(univcode.trim()) ? univcode.trim() : '049';
+
+  if (cleanRegno.length < 3 || cleanRegno.length > 30) {
+    return res.status(400).json({ success: false, message: 'Invalid mobile number length.' });
+  }
+  if (cleanPasswd.length < 1 || cleanPasswd.length > 128) {
+    return res.status(400).json({ success: false, message: 'Invalid password format.' });
   }
 
   try {
     const sessionObj = {
       cookies: {},
-      regno: regno.trim(),
-      univcode: (univcode || '049').trim(),
+      regno: cleanRegno,
+      univcode: cleanUniv,
       studentInfo: null,
       isDemo: false,
       cache: new Map()
     };
 
-    let finalCaptcha = captcha;
+    let finalCaptcha = typeof captcha === 'string' ? captcha.trim() : '';
 
     // First try decrypting stateless captcha token
-    if (captchaToken) {
+    if (captchaToken && typeof captchaToken === 'string') {
       const decryptedCaptcha = decryptCaptchaToken(captchaToken);
       if (decryptedCaptcha && decryptedCaptcha.cookies) {
         sessionObj.cookies = { ...decryptedCaptcha.cookies };
@@ -401,17 +577,18 @@ app.post('/api/login', async (req, res) => {
       }
     }
 
-    const cleanedRegno = regno.replace(/["'& ]/g, '');
-    const cleanedPasswd = passwd.replace(/["'& ]/g, '');
-
-    const bodyString = `&regno=${encodeURIComponent(cleanedRegno)}&passwd=${encodeURIComponent(cleanedPasswd)}&captcha=${encodeURIComponent(finalCaptcha || '123456')}`;
+    // Safely encode POST payload via URLSearchParams (eliminates delimiter injection)
+    const signinParams = new URLSearchParams();
+    signinParams.append('regno', cleanRegno);
+    signinParams.append('passwd', cleanPasswd);
+    signinParams.append('captcha', finalCaptcha || '123456');
 
     const signinResp = await portalFetch('signin.php', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
       },
-      body: bodyString
+      body: signinParams.toString()
     }, sessionObj);
 
     const signinText = await signinResp.text();
@@ -419,13 +596,13 @@ app.post('/api/login', async (req, res) => {
     try {
       signinData = JSON.parse(signinText);
     } catch {
-      signinData = { error_code: -1, msg: signinText || 'Invalid response from portal' };
+      signinData = { error_code: -1, msg: 'Unexpected portal authentication response.' };
     }
 
     if (parseInt(signinData.error_code, 10) !== 0) {
       return res.status(401).json({
         success: false,
-        message: signinData.msg || 'Invalid mobile number or password!'
+        message: (signinData && typeof signinData.msg === 'string') ? signinData.msg : 'Invalid mobile number or password!'
       });
     }
 
@@ -444,7 +621,7 @@ app.post('/api/login', async (req, res) => {
           fexamname: profData.strSemester || profData.fexamname || 'Academic Year',
           photo: profData.photo || profData.photopath || ''
         };
-        if (profData.funivcode) {
+        if (profData.funivcode && /^[a-zA-Z0-9_-]{1,10}$/.test(profData.funivcode)) {
           sessionObj.univcode = profData.funivcode;
         }
       }
@@ -471,7 +648,7 @@ app.post('/api/login', async (req, res) => {
       createdAt: Date.now()
     };
 
-    const sessionId = encryptSession(sessionPayload) || ('sess_' + Date.now());
+    const sessionId = encryptSession(sessionPayload) || ('sess_' + crypto.randomBytes(16).toString('hex'));
     sessions.set(sessionId, sessionObj);
 
     res.json({
@@ -481,8 +658,8 @@ app.post('/api/login', async (req, res) => {
       isDemo: false
     });
   } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({ success: false, message: 'Portal connection failed: ' + err.message });
+    console.error('[Security] Login error:', err.message);
+    res.status(500).json({ success: false, message: 'Portal connection failed. Please check your credentials and try again.' });
   }
 });
 
@@ -581,7 +758,10 @@ app.get('/api/student-info', authMiddleware, (req, res) => {
 // 5. Attendance Summary (Subject-wise)
 app.get('/api/attendance-summary', authMiddleware, async (req, res) => {
   const session = req.userSession;
-  const date = req.query.date || new Date().toISOString().split('T')[0];
+  const rawDate = req.query.date;
+  const date = (typeof rawDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawDate))
+    ? rawDate
+    : new Date().toISOString().split('T')[0];
 
   if (session.isDemo) {
     const demoData = DEMO_SUBJECTS.map(s => ({
@@ -604,7 +784,7 @@ app.get('/api/attendance-summary', authMiddleware, async (req, res) => {
     params.append('date', date);
 
     const resp = await portalFetch(
-      `app.php?a=viewAttendanceDetsummary&univcode=${session.univcode}`,
+      `app.php?a=viewAttendanceDetsummary&univcode=${encodeURIComponent(session.univcode)}`,
       {
         method: 'POST',
         headers: {
@@ -625,7 +805,7 @@ app.get('/api/attendance-summary', authMiddleware, async (req, res) => {
         if (req.sessionId) sessions.delete(req.sessionId);
         return res.status(401).json({ success: false, sessionExpired: true, message: 'University portal session expired. Please sign in again.' });
       }
-      return res.status(502).json({ success: false, message: 'Malformed JSON from portal: ' + text });
+      return res.status(502).json({ success: false, message: 'Unable to parse attendance records from student portal.' });
     }
 
     if (isPortalSessionExpired(data, text)) {
@@ -633,7 +813,7 @@ app.get('/api/attendance-summary', authMiddleware, async (req, res) => {
       return res.status(401).json({
         success: false,
         sessionExpired: true,
-        message: (data && data.msg) || 'University portal session expired. Please sign in again.'
+        message: (data && typeof data.msg === 'string') ? data.msg : 'University portal session expired. Please sign in again.'
       });
     }
 
@@ -645,8 +825,8 @@ app.get('/api/attendance-summary', authMiddleware, async (req, res) => {
       const att = String(item.attended ?? item.fpresentclass ?? item.present ?? 0);
       return {
         ...item,
-        fsubcode: item.fsubcode || item.subcode || item.code || '',
-        fsubname: item.fsubname || item.subname || item.name || '',
+        fsubcode: String(item.fsubcode || item.subcode || item.code || ''),
+        fsubname: String(item.fsubname || item.subname || item.name || ''),
         conducted: cond,
         attended: att,
         ftotalclass: cond,
@@ -660,8 +840,8 @@ app.get('/api/attendance-summary', authMiddleware, async (req, res) => {
       data: normalizedData
     });
   } catch (err) {
-    console.error('Error fetching attendance summary:', err.message);
-    res.status(500).json({ success: false, message: err.message });
+    console.error('[Portal] Error fetching attendance summary:', err.message);
+    res.status(500).json({ success: false, message: 'Failed to retrieve attendance summary from student portal.' });
   }
 });
 
@@ -670,8 +850,8 @@ app.post('/api/attendance-daily', authMiddleware, async (req, res) => {
   const session = req.userSession;
   const { date } = req.body;
 
-  if (!date) {
-    return res.status(400).json({ success: false, message: 'Date is required (YYYY-MM-DD).' });
+  if (!date || typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.status(400).json({ success: false, message: 'Valid date is required (YYYY-MM-DD).' });
   }
 
   if (session.isDemo) {
@@ -701,7 +881,7 @@ app.post('/api/attendance-daily', authMiddleware, async (req, res) => {
     params.append('regno', session.regno);
 
     const resp = await portalFetch(
-      `app.php?a=viewAttendanceDet&univcode=${session.univcode}`,
+      `app.php?a=viewAttendanceDet&univcode=${encodeURIComponent(session.univcode)}`,
       {
         method: 'POST',
         headers: {
@@ -722,7 +902,7 @@ app.post('/api/attendance-daily', authMiddleware, async (req, res) => {
         if (req.sessionId) sessions.delete(req.sessionId);
         return res.status(401).json({ success: false, sessionExpired: true, message: 'University portal session expired. Please sign in again.' });
       }
-      return res.status(502).json({ success: false, message: 'Malformed JSON from portal: ' + text });
+      return res.status(502).json({ success: false, message: 'Unable to parse timetable data from student portal.' });
     }
 
     if (isPortalSessionExpired(data, text)) {
@@ -730,7 +910,7 @@ app.post('/api/attendance-daily', authMiddleware, async (req, res) => {
       return res.status(401).json({
         success: false,
         sessionExpired: true,
-        message: (data && data.msg) || 'University portal session expired. Please sign in again.'
+        message: (data && typeof data.msg === 'string') ? data.msg : 'University portal session expired. Please sign in again.'
       });
     }
 
@@ -746,8 +926,8 @@ app.post('/api/attendance-daily', authMiddleware, async (req, res) => {
       data: classesList
     });
   } catch (err) {
-    console.error(`Error fetching daily attendance for ${date}:`, err.message);
-    res.status(500).json({ success: false, message: err.message });
+    console.error(`[Portal] Error fetching daily attendance for ${date}:`, err.message);
+    res.status(500).json({ success: false, message: 'Failed to retrieve daily attendance records.' });
   }
 });
 
@@ -755,16 +935,16 @@ app.post('/api/attendance-daily', authMiddleware, async (req, res) => {
 // Highly optimized for Vercel Serverless Function execution limits
 app.post('/api/attendance-month', authMiddleware, async (req, res) => {
   const session = req.userSession;
-  const { year, month } = req.body; // month is 1-12
-
-  if (!year || !month) {
-    return res.status(400).json({ success: false, message: 'Year and month are required.' });
-  }
+  const { year, month } = req.body;
 
   const numYear = parseInt(year, 10);
   const numMonth = parseInt(month, 10);
-  const daysInMonth = new Date(numYear, numMonth, 0).getDate();
 
+  if (isNaN(numYear) || numYear < 2020 || numYear > 2035 || isNaN(numMonth) || numMonth < 1 || numMonth > 12) {
+    return res.status(400).json({ success: false, message: 'Valid year (2020-2035) and month (1-12) are required.' });
+  }
+
+  const daysInMonth = new Date(numYear, numMonth, 0).getDate();
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
@@ -834,7 +1014,7 @@ app.post('/api/attendance-month', authMiddleware, async (req, res) => {
         params.append('regno', session.regno);
 
         const resp = await portalFetch(
-          `app.php?a=viewAttendanceDet&univcode=${session.univcode}`,
+          `app.php?a=viewAttendanceDet&univcode=${encodeURIComponent(session.univcode)}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
@@ -850,7 +1030,7 @@ app.post('/api/attendance-month', authMiddleware, async (req, res) => {
 
         if (isPortalSessionExpired(data, text)) {
           portalSessionExpired = true;
-          sessionExpiredMsg = (data && data.msg) || 'University portal session expired.';
+          sessionExpiredMsg = (data && typeof data.msg === 'string') ? data.msg : 'University portal session expired.';
           return;
         }
 
@@ -1072,7 +1252,7 @@ app.get('/api/ia-marks', authMiddleware, async (req, res) => {
     // Try viewIaMarksNew first
     try {
       const resp = await portalFetch(
-        `app.php?a=viewIaMarksNew&univcode=${session.univcode}`,
+        `app.php?a=viewIaMarksNew&univcode=${encodeURIComponent(session.univcode)}`,
         { method: 'GET' },
         session,
         8000
@@ -1098,7 +1278,7 @@ app.get('/api/ia-marks', authMiddleware, async (req, res) => {
     if (!rawHtml && (!parsedData || parsedData.length === 0)) {
       try {
         const resp2 = await portalFetch(
-          `app.php?a=elementWiseMarks&univcode=${session.univcode}`,
+          `app.php?a=elementWiseMarks&univcode=${encodeURIComponent(session.univcode)}`,
           { method: 'GET' },
           session,
           8000
@@ -1123,8 +1303,8 @@ app.get('/api/ia-marks', authMiddleware, async (req, res) => {
       data: parsedData || []
     });
   } catch (err) {
-    console.error('Error fetching IA marks:', err.message);
-    res.status(500).json({ success: false, message: 'Failed to fetch IA marks: ' + err.message });
+    console.error('[Security] Error fetching IA marks:', err.message);
+    res.status(500).json({ success: false, message: 'Failed to retrieve IA marks from student portal.' });
   }
 });
 

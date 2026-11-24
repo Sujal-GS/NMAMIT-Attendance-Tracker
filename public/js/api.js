@@ -35,6 +35,10 @@ const API = {
     localStorage.removeItem('att_session_id');
     localStorage.removeItem('att_student_info');
     localStorage.removeItem('att_is_demo');
+    localStorage.removeItem('att_captcha_token');
+    try {
+      sessionStorage.clear();
+    } catch (e) {}
   },
 
   // Helper request builder with robust non-JSON & 401 handling

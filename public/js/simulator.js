@@ -88,12 +88,15 @@ const Simulator = {
     const subSelect = document.getElementById('sim-subject-select');
     if (!subSelect) return;
 
+    const escape = (str) => (window.escapeHtml ? window.escapeHtml(str) : String(str || ''));
     let options = '<option value="AGGREGATE">Overall College Aggregate</option>';
     if (Array.isArray(subjects)) {
       subjects.forEach(s => {
         const code = s.fsubcode || s.code;
         const name = s.fsubname || s.name || code;
-        options += `<option value="${code}" ${this.selectedSubCode === code ? 'selected' : ''}>${code} - ${name}</option>`;
+        const safeCode = escape(code);
+        const safeName = escape(name);
+        options += `<option value="${safeCode}" ${this.selectedSubCode === code ? 'selected' : ''}>${safeCode} - ${safeName}</option>`;
       });
     }
     subSelect.innerHTML = options;

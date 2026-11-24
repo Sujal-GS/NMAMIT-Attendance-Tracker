@@ -53,9 +53,10 @@ const App = {
       iconSvg = '<svg class="toast-icon text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>';
     }
 
+    const safeMessage = window.escapeHtml ? window.escapeHtml(message) : String(message || '');
     toast.innerHTML = `
       ${iconSvg}
-      <span class="toast-message">${message}</span>
+      <span class="toast-message">${safeMessage}</span>
     `;
 
     container.appendChild(toast);

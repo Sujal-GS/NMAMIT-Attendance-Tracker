@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nmamit-attendance-v14';
+const CACHE_NAME = 'nmamit-attendance-v15';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -41,38 +41,37 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch: Stale-While-Revalidate for Static Assets, Network-Only for dynamic Auth/Captcha/Vercel Analytics, Network-First for API
+// Fetch: Stale-While-Revalidate for Static Assets, Network-Only for dynamic student API routes to prevent multi-user cross-contamination
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
   // Skip non-GET requests
   if (event.request.method !== 'GET') return;
 
-  // Never cache captcha, auth, or Vercel analytics routes
-  if (url.pathname.startsWith('/api/captcha') || url.pathname.startsWith('/api/login') || url.pathname.startsWith('/_vercel')) {
+  // Network-Only for dynamic student data and analytics to ensure data privacy and prevent cross-user leak
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/_vercel')) {
+    // Only allow universities public directory to be cached
+    if (url.pathname === '/api/universities') {
+      event.respondWith(
+        caches.match(event.request).then((cached) => {
+          const fetchPromise = fetch(event.request).then((res) => {
+            if (res && res.status === 200) {
+              const clone = res.clone();
+              caches.open(CACHE_NAME).then((c) => c.put(event.request, clone));
+            }
+            return res;
+          });
+          return cached || fetchPromise;
+        })
+      );
+      return;
+    }
+
     event.respondWith(fetch(event.request));
     return;
   }
 
-  // For API endpoints, try network first, then fall back to cache
-  if (url.pathname.startsWith('/api/')) {
-    event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          if (response && response.status === 200) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        })
-        .catch(() => {
-          return caches.match(event.request);
-        })
-    );
-    return;
-  }
-
-  // For static assets, serve from cache first, then revalidate
+  // For static assets, serve from cache first, then revalidate in background
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request)

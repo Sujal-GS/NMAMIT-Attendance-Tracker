@@ -416,19 +416,23 @@ const CalendarView = {
       return;
     }
 
+    const escape = (str) => (window.escapeHtml ? window.escapeHtml(str) : String(str || ''));
+
     let periodsHtml = '';
     classes.forEach((item, idx) => {
       const isPresent = item.fpresent === '1' || item.fpresent === 1 || String(item.fpresent).trim().toUpperCase() === 'P' || String(item.fpresent).toLowerCase() === 'present';
-      const periodLabel = item.fperiod ? `Period ${item.fperiod}` : `Slot ${idx + 1}`;
+      const periodLabel = item.fperiod ? `Period ${escape(item.fperiod)}` : `Slot ${idx + 1}`;
       const hoursCount = parseInt(item.fnoclass || '1', 10);
+      const safeSubCode = escape(item.fsubcode || 'SUB');
+      const safeSubName = escape(item.fsubname || 'Academic Class');
 
       periodsHtml += `
         <div class="period-item ${isPresent ? 'is-present' : 'is-absent'}">
           <div class="period-info-left">
-            <div class="period-badge-number" title="Period number">${item.fperiod || (idx + 1)}</div>
+            <div class="period-badge-number" title="Period number">${escape(item.fperiod || (idx + 1))}</div>
             <div class="period-meta">
-              <span class="period-subcode">${item.fsubcode || 'SUB'}</span>
-              <span class="period-subname" title="${item.fsubname || 'Subject'}">${item.fsubname || 'Academic Class'}</span>
+              <span class="period-subcode">${safeSubCode}</span>
+              <span class="period-subname" title="${safeSubName}">${safeSubName}</span>
               <span class="period-classes-count">${periodLabel} • ${hoursCount} Hour${hoursCount > 1 ? 's' : ''}</span>
             </div>
           </div>

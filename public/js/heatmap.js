@@ -85,7 +85,8 @@ const HeatmapView = {
             <div class="tooltip-subjects">
               ${dayInfo.classes.slice(0, 5).map(c => {
                 const isPres = (c.fpresent === '1' || c.attended > 0 || String(c.fpresent).toUpperCase() === 'P');
-                const subName = c.fsubname || c.name || c.fsubcode || 'Academic Class';
+                const rawName = c.fsubname || c.name || c.fsubcode || 'Academic Class';
+                const subName = window.escapeHtml ? window.escapeHtml(rawName) : rawName;
                 return `<div class="tooltip-sub-item ${isPres ? 'attended' : 'missed'}">
                   <span class="sub-dot"></span>
                   <span class="sub-name" title="${subName}">${subName}</span>
@@ -276,9 +277,12 @@ const HeatmapView = {
       }
     }
 
+    const escape = (str) => (window.escapeHtml ? window.escapeHtml(str) : String(str || ''));
     let optionsHtml = '<option value="ALL">All Subjects Combined</option>';
     for (const [code, name] of subjectsMap.entries()) {
-      optionsHtml += `<option value="${code}" ${this.selectedSubject === code ? 'selected' : ''}>${code} - ${name}</option>`;
+      const safeCode = escape(code);
+      const safeName = escape(name);
+      optionsHtml += `<option value="${safeCode}" ${this.selectedSubject === code ? 'selected' : ''}>${safeCode} - ${safeName}</option>`;
     }
     filterSelect.innerHTML = optionsHtml;
     if (window.CustomSelect) window.CustomSelect.refresh(filterSelect);
@@ -663,6 +667,7 @@ const HeatmapView = {
       return;
     }
 
+    const escape = (str) => (window.escapeHtml ? window.escapeHtml(str) : String(str || ''));
     let html = '';
     subjects.forEach((sub, idx) => {
       let rankBadge = '';
@@ -681,14 +686,17 @@ const HeatmapView = {
         textClass = 'text-amber';
       }
 
+      const safeName = escape(sub.name);
+      const safeCode = escape(sub.code);
+
       html += `
-        <div class="leaderboard-row" title="${sub.name} (${sub.code}): ${sub.attended}/${sub.conducted} classes (${sub.pct.toFixed(1)}%)">
+        <div class="leaderboard-row" title="${safeName} (${safeCode}): ${sub.attended}/${sub.conducted} classes (${sub.pct.toFixed(1)}%)">
           <div class="leaderboard-row-top">
             <div class="leaderboard-sub-info">
               <span class="leaderboard-rank-badge">${rankBadge}</span>
               <div class="leaderboard-sub-text">
-                <span class="leaderboard-sub-name">${sub.name}</span>
-                <span class="leaderboard-sub-code">${sub.code} • ${sub.attended}/${sub.conducted} classes attended</span>
+                <span class="leaderboard-sub-name">${safeName}</span>
+                <span class="leaderboard-sub-code">${safeCode} • ${sub.attended}/${sub.conducted} classes attended</span>
               </div>
             </div>
             <span class="leaderboard-pct-val ${textClass}">${sub.pct.toFixed(1)}%</span>

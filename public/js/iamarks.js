@@ -214,6 +214,7 @@ const IaMarksView = {
     this.renderHeroMetrics(filtered);
 
     if (filtered.length === 0) {
+      const safeQuery = window.escapeHtml ? window.escapeHtml(this.searchQuery) : this.searchQuery;
       tableContainer.innerHTML = `
         <div class="empty-state">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -221,7 +222,7 @@ const IaMarksView = {
             <line x1="12" y1="8" x2="12" y2="12"></line>
             <line x1="12" y1="16" x2="12.01" y2="16"></line>
           </svg>
-          <p>${this.searchQuery ? `No courses match "${this.searchQuery}".` : 'No CIE marks published on university portal yet.'}</p>
+          <p>${this.searchQuery ? `No courses match "${safeQuery}".` : 'No CIE marks published on university portal yet.'}</p>
         </div>
       `;
       return;
@@ -233,6 +234,8 @@ const IaMarksView = {
       const lower = h.toLowerCase();
       return !/^sl|^sem$|elig/i.test(lower);
     });
+
+    const escape = (str) => (window.escapeHtml ? window.escapeHtml(str) : String(str || ''));
 
     // Build Table HTML
     let tableHtml = `
@@ -246,7 +249,7 @@ const IaMarksView = {
               if (/name/i.test(lower)) alignClass = 'col-left col-name';
               else if (/code/i.test(lower)) alignClass = 'col-left col-code';
               else if (/final/i.test(lower)) alignClass = 'col-center col-final';
-              return `<th class="${alignClass}">${h}</th>`;
+              return `<th class="${alignClass}">${escape(h)}</th>`;
             }).join('')}
           </tr>
         </thead>
@@ -264,18 +267,18 @@ const IaMarksView = {
         if (/code/i.test(lower)) {
           tableHtml += `
             <td class="col-left col-code">
-              <span class="subject-code-tag">${val || row.subCode || 'SUB'}</span>
+              <span class="subject-code-tag">${escape(val || row.subCode || 'SUB')}</span>
             </td>
           `;
         } else if (/name/i.test(lower)) {
           tableHtml += `
             <td class="col-left col-name">
-              <span class="ia-sub-title">${val || row.subName || 'Course'}</span>
+              <span class="ia-sub-title">${escape(val || row.subName || 'Course')}</span>
             </td>
           `;
         } else if (/final/i.test(lower)) {
           const num = parseFloat(val);
-          const displayVal = !isNaN(num) ? num.toFixed(2) : (val || '—');
+          const displayVal = !isNaN(num) ? num.toFixed(2) : escape(val || '—');
           tableHtml += `
             <td class="col-center col-final">
               <span class="ia-final-score">
@@ -289,7 +292,7 @@ const IaMarksView = {
             const label = (val === '-2' || val === '-2.00') ? 'AB' : '—';
             tableHtml += `<td class="col-center"><span class="score-dash ${label === 'AB' ? 'score-ab' : ''}">${label}</span></td>`;
           } else {
-            tableHtml += `<td class="col-center"><span class="score-num">${val}</span></td>`;
+            tableHtml += `<td class="col-center"><span class="score-num">${escape(val)}</span></td>`;
           }
         }
       });

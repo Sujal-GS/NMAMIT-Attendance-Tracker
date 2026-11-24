@@ -258,6 +258,8 @@ const SummaryView = {
         : `${filtered.length} Subject${filtered.length !== 1 ? 's' : ''}`;
     }
 
+    const escape = (str) => (window.escapeHtml ? window.escapeHtml(str) : String(str || ''));
+
     if (filtered.length === 0) {
       gridEl.innerHTML = `
         <div class="empty-state" style="grid-column: 1 / -1;">
@@ -265,7 +267,7 @@ const SummaryView = {
             <circle cx="11" cy="11" r="8"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
-          <p>No subjects match your search "${this.searchQuery}".</p>
+          <p>No subjects match your search "${escape(this.searchQuery)}".</p>
         </div>
       `;
       return;
@@ -275,6 +277,11 @@ const SummaryView = {
     filtered.forEach(s => {
       const code = s.fsubcode || s.code || 'N/A';
       const name = s.fsubname || s.name || 'Course Name';
+
+      const safeCode = escape(code);
+      const safeName = escape(name);
+      const encCode = encodeURIComponent(code);
+      const encName = encodeURIComponent(name);
 
       const sim = this.simulatedDeltas.get(code) || { extraConducted: 0, extraAttended: 0 };
       const baseCond = parseInt(s.conducted ?? s.ftotalclass ?? 0, 10);
@@ -333,12 +340,12 @@ const SummaryView = {
       const hasSimulation = sim.extraConducted > 0;
 
       cardsHtml += `
-        <div class="subject-card" data-subcode="${code}">
+        <div class="subject-card" data-subcode="${safeCode}">
           <!-- Header -->
           <div class="subject-card-header">
             <div class="subject-identity">
-              <span class="subject-code-tag">${code}</span>
-              <h4 class="subject-card-title">${name}</h4>
+              <span class="subject-code-tag">${safeCode}</span>
+              <h4 class="subject-card-title">${safeName}</h4>
             </div>
             <div class="subject-percentage-badge">
               <span class="subject-pct-number ${textClass}">${pct.toFixed(1)}%</span>
@@ -355,7 +362,7 @@ const SummaryView = {
             <div class="progress-stats-line">
               <span class="stat-pill-attended">Attended: <strong>${attended}</strong> / ${conducted}</span>
               <span class="${missed > 0 ? 'text-missed-link' : ''}" 
-                ${missed > 0 ? `onclick="SummaryView.showAbsentDates('${code}', '${encodeURIComponent(name)}', ${missed})" title="Click to view absent dates"` : ''}>
+                ${missed > 0 ? `onclick="SummaryView.showAbsentDates('${encCode}', '${encName}', ${missed})" title="Click to view absent dates"` : ''}>
                 Missed: <strong>${missed}</strong> class${missed !== 1 ? 'es' : ''}
               </span>
             </div>
@@ -378,7 +385,7 @@ const SummaryView = {
             <div class="sim-actions">
               ${missed > 0 ? `
               <button type="button" class="sim-btn sim-btn-absent" 
-                onclick="SummaryView.showAbsentDates('${code}', '${encodeURIComponent(name)}', ${missed})" 
+                onclick="SummaryView.showAbsentDates('${encCode}', '${encName}', ${missed})" 
                 title="View all ${missed} absent date${missed > 1 ? 's' : ''} for this course">
                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
@@ -389,9 +396,9 @@ const SummaryView = {
                 <span>Dates (${missed})</span>
               </button>
               ` : ''}
-              <button class="sim-btn" onclick="SummaryView.simulate('${code}', 1, 1)" title="Simulate attending next class">+1 Attend</button>
-              <button class="sim-btn sim-btn-danger" onclick="SummaryView.simulate('${code}', 1, 0)" title="Simulate skipping next class">+1 Miss</button>
-              ${hasSimulation ? `<button class="sim-reset-btn" onclick="SummaryView.resetSimulation('${code}')">Reset</button>` : ''}
+              <button class="sim-btn" onclick="SummaryView.simulate('${encCode}', 1, 1)" title="Simulate attending next class">+1 Attend</button>
+              <button class="sim-btn sim-btn-danger" onclick="SummaryView.simulate('${encCode}', 1, 0)" title="Simulate skipping next class">+1 Miss</button>
+              ${hasSimulation ? `<button class="sim-reset-btn" onclick="SummaryView.resetSimulation('${encCode}')">Reset</button>` : ''}
             </div>
           </div>
         </div>
@@ -401,7 +408,8 @@ const SummaryView = {
     gridEl.innerHTML = cardsHtml;
   },
 
-  simulate(subCode, addConducted, addAttended) {
+  simulate(subCodeEncoded, addConducted, addAttended) {
+    const subCode = decodeURIComponent(subCodeEncoded);
     const current = this.simulatedDeltas.get(subCode) || { extraConducted: 0, extraAttended: 0 };
     current.extraConducted += addConducted;
     current.extraAttended += addAttended;
@@ -409,12 +417,14 @@ const SummaryView = {
     this.render();
   },
 
-  resetSimulation(subCode) {
+  resetSimulation(subCodeEncoded) {
+    const subCode = decodeURIComponent(subCodeEncoded);
     this.simulatedDeltas.delete(subCode);
     this.render();
   },
 
-  showAbsentDates(subCode, subNameEncoded, missedCount) {
+  showAbsentDates(subCodeEncoded, subNameEncoded, missedCount) {
+    const subCode = decodeURIComponent(subCodeEncoded);
     const subName = decodeURIComponent(subNameEncoded);
     const modal = document.getElementById('absent-dates-modal');
     if (!modal) return;
