@@ -1,11 +1,12 @@
 /**
  * IA Marks (Continuous Internal Evaluation) View Module
- * Fetches, parses, and displays student internal marks with modern dark-mode aesthetics
+ * Renders official university marks in a high-fidelity dark glassmorphic table
  */
 
 const IaMarksView = {
-  rawSubjects: [],
   rawHtml: '',
+  headers: [],
+  rows: [],
   searchQuery: '',
   isInitialized: false,
 
@@ -36,7 +37,7 @@ const IaMarksView = {
           }
           await this.load();
           if (window.App && typeof window.App.showToast === 'function') {
-            window.App.showToast('IA Marks updated!', 'success');
+            window.App.showToast('Official IA Marks updated!', 'success');
           }
         } finally {
           refreshBtn.disabled = false;
@@ -47,12 +48,12 @@ const IaMarksView = {
   },
 
   async load() {
-    const gridEl = document.getElementById('ia-cards-grid');
-    if (gridEl) {
-      gridEl.innerHTML = `
-        <div class="empty-state" style="grid-column: 1 / -1;">
+    const tableContainer = document.getElementById('ia-table-container');
+    if (tableContainer) {
+      tableContainer.innerHTML = `
+        <div class="ia-loading-state">
           <div class="btn-spinner"></div>
-          <p>Fetching official IA marks from student portal...</p>
+          <p>Fetching official university CIE table from student portal...</p>
         </div>
       `;
     }
@@ -61,22 +62,27 @@ const IaMarksView = {
       const res = await API.getIaMarks();
       if (res && res.success) {
         this.rawHtml = res.rawHtml || '';
-        let subjects = Array.isArray(res.data) ? res.data : [];
+        let parsed = { headers: [], rows: [] };
 
-        // If backend returned rawHtml but no structured subjects, parse from HTML table
-        if (subjects.length === 0 && this.rawHtml) {
-          subjects = this.parseTableHtml(this.rawHtml);
+        if (this.rawHtml) {
+          parsed = this.parseTableHtml(this.rawHtml);
         }
 
-        this.rawSubjects = subjects;
+        // If parsed rows is empty but res.data exists as an array
+        if (parsed.rows.length === 0 && Array.isArray(res.data) && res.data.length > 0) {
+          parsed = this.parseStructuredData(res.data);
+        }
+
+        this.headers = parsed.headers;
+        this.rows = parsed.rows;
       } else {
-        this.rawSubjects = [];
-        this.rawHtml = '';
+        this.headers = [];
+        this.rows = [];
       }
     } catch (err) {
       console.warn('Failed to load IA marks:', err.message);
-      this.rawSubjects = [];
-      this.rawHtml = '';
+      this.headers = [];
+      this.rows = [];
     }
 
     this.render();
@@ -87,76 +93,117 @@ const IaMarksView = {
       const parser = new DOMParser();
       const doc = parser.parseFromString(htmlStr, 'text/html');
       const table = doc.querySelector('table');
-      if (!table) return [];
+      if (!table) return { headers: [], rows: [] };
 
-      const rows = Array.from(table.querySelectorAll('tr'));
-      if (rows.length < 2) return [];
+      const trs = Array.from(table.querySelectorAll('tr'));
+      if (trs.length === 0) return { headers: [], rows: [] };
 
-      // Extract header names
-      const headerRow = rows[0];
-      const headers = Array.from(headerRow.querySelectorAll('th, td')).map(c => c.textContent.trim().toLowerCase());
+      // Find the row containing column headers
+      let headerRowIndex = -1;
+      let rawHeaders = [];
 
-      const parsed = [];
-      for (let i = 1; i < rows.length; i++) {
-        const cells = Array.from(rows[i].querySelectorAll('td')).map(c => c.textContent.trim());
-        if (cells.length < 3) continue;
-
-        let subcode = '';
-        let subname = '';
-        const tests = [];
-        let total = 0;
-        let maxTotal = 50;
-
-        cells.forEach((val, cIdx) => {
-          const hName = headers[cIdx] || `col_${cIdx}`;
-          if (hName.includes('code') || hName.includes('subcode')) {
-            subcode = val;
-          } else if (hName.includes('name') || hName.includes('subject')) {
-            subname = val;
-          } else if (hName.includes('test') || hName.includes('ia') || hName.includes('cie') || hName.includes('event') || hName.includes('quiz') || hName.includes('assessment')) {
-            const numVal = parseFloat(val);
-            tests.push({
-              name: headers[cIdx] ? headers[cIdx].toUpperCase() : `Test ${tests.length + 1}`,
-              marks: isNaN(numVal) ? val : numVal.toFixed(1),
-              max: hName.includes('test') ? 30 : 20
-            });
-          } else if (hName.includes('total')) {
-            const num = parseFloat(val);
-            if (!isNaN(num)) total = num;
-          }
-        });
-
-        if (subcode || subname) {
-          const numTotal = total || tests.reduce((sum, t) => sum + (parseFloat(t.marks) || 0), 0);
-          parsed.push({
-            subcode: subcode || `SUB-${i}`,
-            subname: subname || subcode || `Course ${i}`,
-            tests,
-            total: numTotal.toFixed(1),
-            maxTotal: maxTotal,
-            percentage: maxTotal > 0 ? (numTotal / maxTotal) * 100 : 0,
-            status: numTotal >= 45 ? 'Outstanding' : numTotal >= 38 ? 'Good' : 'Average'
-          });
+      for (let i = 0; i < trs.length; i++) {
+        const ths = Array.from(trs[i].querySelectorAll('th, td'));
+        const texts = ths.map(c => c.textContent.trim());
+        const hasSub = texts.some(t => /sub.*code|subject/i.test(t));
+        const hasMarks = texts.some(t => /mse|marks|la-|final/i.test(t));
+        if (hasSub || (texts.length >= 4 && hasMarks)) {
+          headerRowIndex = i;
+          rawHeaders = texts;
+          break;
         }
       }
-      return parsed;
+
+      if (headerRowIndex === -1) {
+        headerRowIndex = trs.length > 1 ? 1 : 0;
+        rawHeaders = Array.from(trs[headerRowIndex].querySelectorAll('th, td')).map(c => c.textContent.trim());
+      }
+
+      const rows = [];
+      for (let i = headerRowIndex + 1; i < trs.length; i++) {
+        const tds = Array.from(trs[i].querySelectorAll('td, th'));
+        if (tds.length < 3) continue;
+
+        const cells = tds.map(c => c.textContent.trim());
+        const rowObj = {
+          _rawCells: cells
+        };
+
+        rawHeaders.forEach((h, colIdx) => {
+          rowObj[h] = cells[colIdx] || '';
+          const lower = h.toLowerCase();
+          if (/sub.*code/i.test(lower)) rowObj.subCode = cells[colIdx] || '';
+          else if (/sub.*name/i.test(lower)) rowObj.subName = cells[colIdx] || '';
+          else if (/final.*mark|final/i.test(lower)) rowObj.finalMarks = cells[colIdx] || '';
+          else if (/sem/i.test(lower)) rowObj.sem = cells[colIdx] || '';
+          else if (/sl.*no|^no$/i.test(lower)) rowObj.slNo = cells[colIdx] || '';
+          else if (/elig/i.test(lower)) rowObj.eligibility = cells[colIdx] || '';
+        });
+
+        // Fallbacks if not mapped
+        if (!rowObj.subCode && cells[2]) rowObj.subCode = cells[2];
+        if (!rowObj.subName && cells[3]) rowObj.subName = cells[3];
+        if (!rowObj.finalMarks) {
+          for (let c = cells.length - 1; c >= 0; c--) {
+            if (/^\d+(\.\d+)?$/.test(cells[c])) {
+              rowObj.finalMarks = cells[c];
+              break;
+            }
+          }
+        }
+
+        if (rowObj.subCode || rowObj.subName) {
+          rows.push(rowObj);
+        }
+      }
+
+      return { headers: rawHeaders, rows };
     } catch (e) {
-      console.warn('[IaMarksView] HTML Table parsing warning:', e);
-      return [];
+      console.error('parseTableHtml error:', e);
+      return { headers: [], rows: [] };
     }
   },
 
+  parseStructuredData(arr) {
+    if (!Array.isArray(arr) || arr.length === 0) return { headers: [], rows: [] };
+    
+    // Standard NMAMIT headers
+    const headers = ['Sl. No.', 'Sub. Code', 'Sub. Name', 'MSE-1', 'MSE-2', 'LA-1', 'LA-2', 'LA-3', 'RECORD', 'CONDUCTION', 'MSE(LAB)', 'Final Marks', 'Eligibility'];
+    
+    const rows = arr.map((item, idx) => {
+      return {
+        'Sl. No.': item.slNo || String(idx + 1),
+        'Sub. Code': item.subcode || item.fsubcode || '',
+        'Sub. Name': item.subname || item.fsubname || '',
+        'MSE-1': item.mse1 ?? item.ftest1 ?? '',
+        'MSE-2': item.mse2 ?? item.ftest2 ?? '',
+        'LA-1': item.la1 ?? item.fevent ?? '',
+        'LA-2': item.la2 ?? '',
+        'LA-3': item.la3 ?? '',
+        'RECORD': item.record ?? '',
+        'CONDUCTION': item.conduction ?? '',
+        'MSE(LAB)': item.mseLab ?? '',
+        'Final Marks': item.finalMarks ?? item.total ?? '',
+        'Eligibility': item.eligibility ?? 'Eligible',
+        subCode: item.subcode || item.fsubcode || '',
+        subName: item.subname || item.fsubname || '',
+        finalMarks: item.finalMarks ?? item.total ?? ''
+      };
+    });
+
+    return { headers, rows };
+  },
+
   render() {
-    const gridEl = document.getElementById('ia-cards-grid');
+    const tableContainer = document.getElementById('ia-table-container');
     const countBadgeEl = document.getElementById('ia-subjects-count-badge');
-    if (!gridEl) return;
+    if (!tableContainer) return;
 
-    this.renderHeroMetrics();
-
-    // Filter by search query
-    const filtered = this.rawSubjects.filter(s => {
-      const code = (s.subcode || s.fsubcode || s.fsubshort || '').toLowerCase();
-      const name = (s.subname || s.fsubname || '').toLowerCase();
+    // Filter rows by search query
+    const filtered = this.rows.filter(r => {
+      if (!this.searchQuery) return true;
+      const code = (r.subCode || '').toLowerCase();
+      const name = (r.subName || '').toLowerCase();
       return code.includes(this.searchQuery) || name.includes(this.searchQuery);
     });
 
@@ -164,171 +211,137 @@ const IaMarksView = {
       countBadgeEl.textContent = `${filtered.length} Subject${filtered.length !== 1 ? 's' : ''}`;
     }
 
+    this.renderHeroMetrics(filtered);
+
     if (filtered.length === 0) {
-      gridEl.innerHTML = `
-        <div class="empty-state" style="grid-column: 1 / -1;">
+      tableContainer.innerHTML = `
+        <div class="empty-state">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <circle cx="12" cy="12" r="10"></circle>
             <line x1="12" y1="8" x2="12" y2="12"></line>
             <line x1="12" y1="16" x2="12.01" y2="16"></line>
           </svg>
-          <p>${this.searchQuery ? `No IA marks match "${this.searchQuery}".` : 'No Internal Assessment marks published by university examination division yet.'}</p>
+          <p>${this.searchQuery ? `No courses match "${this.searchQuery}".` : 'No official CIE marks published on university portal yet.'}</p>
         </div>
       `;
       return;
     }
 
-    let cardsHtml = '';
-    filtered.forEach(item => {
-      const code = item.subcode || item.fsubcode || item.fsubshort || 'SUB';
-      const name = item.subname || item.fsubname || 'Course Name';
-      const total = parseFloat(item.total ?? item.grandtotal ?? 0);
-      const maxTotal = parseFloat(item.maxTotal ?? 50);
-      const pct = maxTotal > 0 ? (total / maxTotal) * 100 : 0;
-
-      let colorVar = 'var(--emerald)';
-      let textClass = 'text-emerald';
-      let tierLabel = 'Outstanding';
-
-      if (pct < 60) {
-        colorVar = 'var(--rose)';
-        textClass = 'text-rose';
-        tierLabel = 'Needs Improvement';
-      } else if (pct < 75) {
-        colorVar = 'var(--amber)';
-        textClass = 'text-amber';
-        tierLabel = 'Average';
-      } else if (pct < 90) {
-        colorVar = 'var(--primary)';
-        textClass = 'text-contrast';
-        tierLabel = 'Good';
-      }
-
-      // Render individual component test pills
-      let testsHtml = '';
-      if (Array.isArray(item.tests) && item.tests.length > 0) {
-        testsHtml = item.tests.map(t => {
-          const tMarks = t.marks === '-2' || t.marks === '-2.00' ? 'AB' : t.marks;
-          return `
-            <div class="ia-test-pill">
-              <span class="ia-test-name">${t.name}</span>
-              <span class="ia-test-score">${tMarks}${t.max ? `<span class="ia-test-max">/${t.max}</span>` : ''}</span>
-            </div>
-          `;
-        }).join('');
-      } else {
-        // Fallback fields from elementWiseMarks format (ftest1, ftest2, fevent)
-        const t1 = item.ftest1 != null ? (item.ftest1 === '-2.00' ? 'AB' : item.ftest1) : null;
-        const t2 = item.ftest2 != null ? (item.ftest2 === '-2.00' ? 'AB' : item.ftest2) : null;
-        const event = item.fevent != null ? (item.fevent === '-2.00' ? 'AB' : item.fevent) : null;
-
-        const pills = [];
-        if (t1 != null) pills.push({ name: 'Test 1', score: t1 });
-        if (t2 != null) pills.push({ name: 'Test 2', score: t2 });
-        if (event != null) pills.push({ name: 'Assessment', score: event });
-
-        testsHtml = pills.map(p => `
-          <div class="ia-test-pill">
-            <span class="ia-test-name">${p.name}</span>
-            <span class="ia-test-score">${p.score}</span>
-          </div>
-        `).join('');
-      }
-
-      cardsHtml += `
-        <div class="subject-card ia-card" data-subcode="${code}">
-          <!-- Header -->
-          <div class="subject-card-header">
-            <div class="subject-identity">
-              <span class="subject-code-tag">${code}</span>
-              <h4 class="subject-card-title">${name}</h4>
-            </div>
-            <div class="subject-percentage-badge">
-              <span class="subject-pct-number ${textClass}">${pct.toFixed(1)}%</span>
-              <span class="subject-status-mini ${textClass}">${tierLabel}</span>
-            </div>
-          </div>
-
-          <!-- Component Test Pills -->
-          <div class="ia-tests-wrapper">
-            ${testsHtml || '<div class="ia-tests-pending">Evaluation components in progress</div>'}
-          </div>
-
-          <!-- Total Score Line & Progress Bar -->
-          <div class="progress-container" style="margin-top: 14px;">
-            <div class="progress-track">
-              <div class="progress-fill" style="width: ${Math.min(100, pct)}%; background-color: ${colorVar};"></div>
-            </div>
-            <div class="progress-stats-line">
-              <span>Scored: <strong>${total.toFixed(1)}</strong> / ${maxTotal} marks</span>
-              <span class="${textClass}"><strong>${pct.toFixed(1)}%</strong> overall</span>
-            </div>
-          </div>
-        </div>
-      `;
+    // Determine columns to display
+    // Exclude redundant columns like "Sl. No." or "Sem" if we render our own clean "#" column
+    const displayHeaders = this.headers.filter(h => {
+      const lower = h.toLowerCase();
+      return !/^sl|^sem$/i.test(lower);
     });
 
-    gridEl.innerHTML = cardsHtml;
+    // Build Table HTML
+    let tableHtml = `
+      <table class="ia-modern-table">
+        <thead>
+          <tr>
+            <th class="col-num">#</th>
+            ${displayHeaders.map(h => {
+              const lower = h.toLowerCase();
+              let alignClass = 'col-center';
+              if (/name/i.test(lower)) alignClass = 'col-left col-name';
+              else if (/code/i.test(lower)) alignClass = 'col-left col-code';
+              else if (/final/i.test(lower)) alignClass = 'col-center col-final';
+              return `<th class="${alignClass}">${h}</th>`;
+            }).join('')}
+          </tr>
+        </thead>
+        <tbody>
+    `;
 
-    // Render raw HTML table fallback container if available
-    const rawContainer = document.getElementById('ia-raw-table-container');
-    const rawContent = document.getElementById('ia-raw-table-content');
-    if (rawContainer && rawContent && this.rawHtml) {
-      rawContent.innerHTML = this.rawHtml;
-      rawContainer.classList.remove('hidden');
-    }
+    filtered.forEach((row, idx) => {
+      tableHtml += `<tr>`;
+      tableHtml += `<td class="col-num">${idx + 1}</td>`;
+
+      displayHeaders.forEach(h => {
+        const lower = h.toLowerCase();
+        let val = row[h] != null ? String(row[h]).trim() : '';
+
+        if (/code/i.test(lower)) {
+          tableHtml += `
+            <td class="col-left col-code">
+              <span class="subject-code-tag">${val || row.subCode || 'SUB'}</span>
+            </td>
+          `;
+        } else if (/name/i.test(lower)) {
+          tableHtml += `
+            <td class="col-left col-name">
+              <span class="ia-sub-title">${val || row.subName || 'Course'}</span>
+            </td>
+          `;
+        } else if (/final/i.test(lower)) {
+          const num = parseFloat(val);
+          const displayVal = !isNaN(num) ? num.toFixed(2) : (val || '—');
+          tableHtml += `
+            <td class="col-center col-final">
+              <div class="ia-final-pill">
+                <strong>${displayVal}</strong>
+                <span class="ia-denom">/ 50</span>
+              </div>
+            </td>
+          `;
+        } else if (/elig/i.test(lower)) {
+          const isElig = !val || /elig|yes|ok|true/i.test(val);
+          tableHtml += `
+            <td class="col-center">
+              <span class="ia-status-pill ${isElig ? 'pill-eligible' : 'pill-warning'}">
+                ${val || 'Eligible'}
+              </span>
+            </td>
+          `;
+        } else {
+          // Standard score column (MSE-1, MSE-2, LA-1, etc.)
+          if (!val || val === '-2' || val === '-2.00') {
+            const label = (val === '-2' || val === '-2.00') ? 'AB' : '—';
+            tableHtml += `<td class="col-center"><span class="score-dash ${label === 'AB' ? 'score-ab' : ''}">${label}</span></td>`;
+          } else {
+            tableHtml += `<td class="col-center"><span class="score-num">${val}</span></td>`;
+          }
+        }
+      });
+
+      tableHtml += `</tr>`;
+    });
+
+    tableHtml += `
+        </tbody>
+      </table>
+    `;
+
+    tableContainer.innerHTML = tableHtml;
   },
 
-  renderHeroMetrics() {
-    let totalScored = 0;
-    let totalMax = 0;
-    let validCount = 0;
+  renderHeroMetrics(rows) {
+    let totalFinal = 0;
+    let finalCount = 0;
+    let highest = 0;
 
-    this.rawSubjects.forEach(s => {
-      const tot = parseFloat(s.total ?? s.grandtotal ?? 0);
-      const mTot = parseFloat(s.maxTotal ?? 50);
-      if (!isNaN(tot) && tot > 0) {
-        totalScored += tot;
-        totalMax += mTot;
-        validCount++;
+    rows.forEach(r => {
+      const fStr = r.finalMarks || '';
+      const fNum = parseFloat(fStr);
+      if (!isNaN(fNum) && fNum > 0) {
+        totalFinal += fNum;
+        finalCount++;
+        if (fNum > highest) highest = fNum;
       }
     });
 
-    const avgPct = totalMax > 0 ? (totalScored / totalMax) * 100 : 0;
+    const avgFinal = finalCount > 0 ? (totalFinal / finalCount) : 0;
+    const avgPct = (avgFinal / 50) * 100;
 
-    const pctEl = document.getElementById('ia-overall-percentage');
-    const gaugeEl = document.getElementById('ia-gauge-bar');
-    const scoredEl = document.getElementById('ia-total-scored');
-    const maxEl = document.getElementById('ia-max-possible');
-    const countEl = document.getElementById('ia-courses-count');
-    const statusChipEl = document.getElementById('ia-status-chip');
-    const statusTextEl = document.getElementById('ia-status-text');
+    const avgScoreEl = document.getElementById('ia-hero-avg-score');
+    const avgPctEl = document.getElementById('ia-hero-avg-pct');
+    const countEl = document.getElementById('ia-hero-courses-count');
+    const highestEl = document.getElementById('ia-hero-highest-score');
 
-    if (pctEl) pctEl.textContent = validCount > 0 ? `${avgPct.toFixed(1)}%` : '--%';
-    if (scoredEl) scoredEl.textContent = totalScored.toFixed(1);
-    if (maxEl) maxEl.textContent = `Out of ${totalMax.toFixed(0)} total marks`;
-    if (countEl) countEl.textContent = this.rawSubjects.length;
-
-    if (gaugeEl) {
-      const radius = 52;
-      const circumference = 2 * Math.PI * radius;
-      gaugeEl.style.strokeDasharray = `${circumference} ${circumference}`;
-      const offset = circumference - (Math.min(100, avgPct) / 100) * circumference;
-      gaugeEl.style.strokeDashoffset = offset;
-    }
-
-    if (statusChipEl && statusTextEl) {
-      if (avgPct >= 85) {
-        statusChipEl.className = 'status-chip status-chip-success';
-        statusTextEl.textContent = 'Excellent Standing';
-      } else if (avgPct >= 70) {
-        statusChipEl.className = 'status-chip status-chip-info';
-        statusTextEl.textContent = 'Good Standing';
-      } else {
-        statusChipEl.className = 'status-chip status-chip-warning';
-        statusTextEl.textContent = 'Active Evaluation';
-      }
-    }
+    if (avgScoreEl) avgScoreEl.textContent = finalCount > 0 ? `${avgFinal.toFixed(1)} / 50` : '—';
+    if (avgPctEl) avgPctEl.textContent = finalCount > 0 ? `${avgPct.toFixed(1)}% CIE Average` : 'CIE in progress';
+    if (countEl) countEl.textContent = `${rows.length} Courses`;
+    if (highestEl) highestEl.textContent = highest > 0 ? `${highest.toFixed(1)} / 50` : '—';
   }
 };
 

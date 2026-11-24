@@ -889,76 +889,178 @@ app.get('/api/ia-marks', authMiddleware, async (req, res) => {
   if (session.isDemo) {
     const demoIa = [
       {
+        slNo: '1',
+        sem: 'V',
         subcode: 'CB3001-1',
         subname: 'Information and Network Security',
-        tests: [
-          { name: 'Test 1', marks: '27.5', max: '30' },
-          { name: 'Test 2', marks: '28.0', max: '30' },
-          { name: 'Assessment', marks: '19.0', max: '20' }
-        ],
-        total: '46.8',
-        maxTotal: '50',
-        percentage: 93.6,
-        status: 'Outstanding'
+        mse1: '19.00',
+        mse2: '20.00',
+        la1: '4.00',
+        la2: '4.00',
+        la3: '2.00',
+        record: '10.00',
+        conduction: '10.00',
+        mseLab: '25.00',
+        finalMarks: '48.00',
+        eligibility: 'Eligible'
       },
       {
-        subcode: 'CB3002-1',
-        subname: 'Database Management Systems',
-        tests: [
-          { name: 'Test 1', marks: '26.0', max: '30' },
-          { name: 'Test 2', marks: '27.0', max: '30' },
-          { name: 'Assessment', marks: '18.5', max: '20' }
-        ],
-        total: '45.0',
-        maxTotal: '50',
-        percentage: 90.0,
-        status: 'Outstanding'
+        slNo: '2',
+        sem: 'V',
+        subcode: 'CB2004-1',
+        subname: 'Principles of Database Management Systems',
+        mse1: '18.50',
+        mse2: '14.00',
+        la1: '4.00',
+        la2: '4.00',
+        la3: '2.00',
+        record: '10.00',
+        conduction: '10.00',
+        mseLab: '30.00',
+        finalMarks: '46.00',
+        eligibility: 'Eligible'
       },
       {
+        slNo: '3',
+        sem: 'V',
         subcode: 'CB3003-1',
-        subname: 'Design & Analysis of Algorithms',
-        tests: [
-          { name: 'Test 1', marks: '25.0', max: '30' },
-          { name: 'Test 2', marks: '24.5', max: '30' },
-          { name: 'Assessment', marks: '17.0', max: '20' }
-        ],
-        total: '41.8',
-        maxTotal: '50',
-        percentage: 83.6,
-        status: 'Good'
+        subname: 'Essentials of Operating Systems',
+        mse1: '12.00',
+        mse2: '16.00',
+        la1: '4.00',
+        la2: '4.00',
+        la3: '2.00',
+        record: '',
+        conduction: '',
+        mseLab: '',
+        finalMarks: '38.00',
+        eligibility: 'Eligible'
       },
       {
-        subcode: 'CB3004-1',
-        subname: 'Computer Networks & Protocols',
-        tests: [
-          { name: 'Test 1', marks: '28.0', max: '30' },
-          { name: 'Test 2', marks: '29.0', max: '30' },
-          { name: 'Assessment', marks: '19.5', max: '20' }
-        ],
-        total: '48.0',
-        maxTotal: '50',
-        percentage: 96.0,
-        status: 'Exemplary'
+        slNo: '4',
+        sem: 'V',
+        subcode: 'CB3222-1',
+        subname: 'Malware Analysis and Detection',
+        mse1: '17.00',
+        mse2: '19.50',
+        la1: '4.00',
+        la2: '4.00',
+        la3: '2.00',
+        record: '',
+        conduction: '',
+        mseLab: '',
+        finalMarks: '47.00',
+        eligibility: 'Eligible'
       },
       {
-        subcode: 'CB3005-1',
-        subname: 'Software Engineering & Agile',
-        tests: [
-          { name: 'Test 1', marks: '23.5', max: '30' },
-          { name: 'Test 2', marks: '25.0', max: '30' },
-          { name: 'Assessment', marks: '16.0', max: '20' }
-        ],
-        total: '40.3',
-        maxTotal: '50',
-        percentage: 80.6,
-        status: 'Good'
+        slNo: '5',
+        sem: 'V',
+        subcode: 'HU1010-1',
+        subname: 'Research Methodology',
+        mse1: '16.00',
+        mse2: '18.00',
+        la1: '4.00',
+        la2: '4.00',
+        la3: '2.00',
+        record: '',
+        conduction: '',
+        mseLab: '',
+        finalMarks: '44.00',
+        eligibility: 'Eligible'
+      },
+      {
+        slNo: '6',
+        sem: 'V',
+        subcode: 'CB3603-1',
+        subname: 'Secure Full Stack Web Development',
+        mse1: '',
+        mse2: '',
+        la1: '',
+        la2: '',
+        la3: '',
+        record: '9.00',
+        conduction: '20.00',
+        mseLab: '20.00',
+        finalMarks: '49.00',
+        eligibility: 'Eligible'
+      },
+      {
+        slNo: '7',
+        sem: 'V',
+        subcode: 'HU1006-1',
+        subname: 'Introduction to IPR',
+        mse1: '18.00',
+        mse2: '13.00',
+        la1: '4.00',
+        la2: '4.00',
+        la3: '2.00',
+        record: '',
+        conduction: '',
+        mseLab: '',
+        finalMarks: '41.00',
+        eligibility: 'Eligible'
+      },
+      {
+        slNo: '8',
+        sem: 'V',
+        subcode: 'HU1007-1',
+        subname: 'Social Connect & Responsibility',
+        mse1: '17.00',
+        mse2: '20.00',
+        la1: '4.00',
+        la2: '4.00',
+        la3: '2.00',
+        record: '',
+        conduction: '',
+        mseLab: '',
+        finalMarks: '47.00',
+        eligibility: 'Eligible'
+      },
+      {
+        slNo: '9',
+        sem: 'V',
+        subcode: 'UM1003-1',
+        subname: 'Employability Skill Development',
+        mse1: '13.00',
+        mse2: '18.00',
+        la1: '2.00',
+        la2: '4.00',
+        la3: '2.00',
+        record: '',
+        conduction: '',
+        mseLab: '',
+        finalMarks: '39.00',
+        eligibility: 'Eligible'
       }
     ];
+
+    const demoTableHtml = `
+      <table class="table table-bordered">
+        <thead>
+          <tr><th colspan="14">IA / CIE Details</th></tr>
+          <tr>
+            <th>Sl. No.</th><th>Sem</th><th>Sub. Code</th><th>Sub. Name</th>
+            <th>MSE-1</th><th>MSE-2</th><th>LA-1</th><th>LA-2</th><th>LA-3</th>
+            <th>RECORD</th><th>CONDUCTION</th><th>MSE(LAB)</th><th>Final Marks</th><th>Eligibility</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${demoIa.map(s => `
+            <tr>
+              <td>${s.slNo}</td><td>${s.sem}</td><td>${s.subcode}</td><td>${s.subname}</td>
+              <td>${s.mse1}</td><td>${s.mse2}</td><td>${s.la1}</td><td>${s.la2}</td><td>${s.la3}</td>
+              <td>${s.record}</td><td>${s.conduction}</td><td>${s.mseLab}</td><td>${s.finalMarks}</td><td>${s.eligibility}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
 
     return res.json({
       success: true,
       error_code: 0,
       data: demoIa,
+      rawHtml: demoTableHtml,
       isDemo: true
     });
   }

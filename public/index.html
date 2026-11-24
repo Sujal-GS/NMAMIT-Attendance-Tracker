@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=7">
+  <link rel="stylesheet" href="css/style.css?v=8">
 
   <!-- Vercel Web Analytics & Speed Insights -->
   <script>
@@ -816,36 +816,40 @@
         <!-- IA Aggregates Hero Banner -->
         <div class="summary-hero-card ia-hero-card">
           <div class="hero-left">
-            <div class="aggregate-gauge-wrapper">
-              <svg class="radial-gauge" viewBox="0 0 120 120">
-                <circle class="gauge-bg" cx="60" cy="60" r="52"></circle>
-                <circle class="gauge-progress" id="ia-gauge-bar" cx="60" cy="60" r="52"></circle>
+            <div class="ia-hero-icon-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
               </svg>
-              <div class="gauge-inner-text">
-                <span id="ia-overall-percentage" class="gauge-percentage">--%</span>
-                <span class="gauge-label">Average IA</span>
-              </div>
             </div>
             <div class="hero-status-message">
-              <div class="status-chip" id="ia-status-chip">
+              <div class="status-chip safe" id="ia-status-chip">
                 <span class="chip-indicator"></span>
-                <span id="ia-status-text">Internal Assessment</span>
+                <span id="ia-status-text">Official Examination Records</span>
               </div>
-              <h2 id="ia-headline" class="hero-headline">CIE Evaluation Marks</h2>
-              <p id="ia-subtext" class="hero-description">Continuous Internal Evaluation test components, assignments & normalized scores.</p>
+              <h2 id="ia-headline" class="hero-headline">Continuous Internal Evaluation (CIE)</h2>
+              <p id="ia-subtext" class="hero-description">Official Mid-Semester Exams, Lab Assessments, and Course Work evaluations published by the university.</p>
             </div>
           </div>
 
           <div class="hero-right">
             <div class="aggregate-metric-box">
-              <span class="amb-label">Scored Total</span>
-              <span class="amb-val text-emerald" id="ia-total-scored">0</span>
-              <span class="amb-sub" id="ia-max-possible">Out of 0 marks</span>
+              <span class="amb-label">Average CIE Score</span>
+              <span class="amb-val text-emerald" id="ia-hero-avg-score">—</span>
+              <span class="amb-sub" id="ia-hero-avg-pct">Overall Average</span>
             </div>
             <div class="aggregate-metric-box">
               <span class="amb-label">Evaluated Courses</span>
-              <span class="amb-val" id="ia-courses-count">0</span>
-              <span class="amb-sub">Subjects with published IA</span>
+              <span class="amb-val" id="ia-hero-courses-count">0</span>
+              <span class="amb-sub">Official subjects</span>
+            </div>
+            <div class="aggregate-metric-box">
+              <span class="amb-label">Highest Score</span>
+              <span class="amb-val text-contrast" id="ia-hero-highest-score">—</span>
+              <span class="amb-sub">Out of 50 marks</span>
             </div>
           </div>
         </div>
@@ -853,7 +857,7 @@
         <!-- Controls / Search Bar -->
         <div class="subjects-toolbar">
           <div class="toolbar-left">
-            <h3 class="section-title">Course-wise IA Breakdown</h3>
+            <h3 class="section-title">Official CIE Marks Sheet</h3>
             <span class="count-badge" id="ia-subjects-count-badge">0 Subjects</span>
           </div>
           <div class="toolbar-right">
@@ -874,21 +878,16 @@
           </div>
         </div>
 
-        <!-- Subjects Grid for IA -->
-        <div id="ia-cards-grid" class="subjects-grid">
-          <div class="empty-state" style="grid-column: 1 / -1;">
-            <div class="btn-spinner"></div>
-            <p>Fetching official IA marks from student portal...</p>
+        <!-- Glassmorphic Official CIE Table Card -->
+        <div class="ia-table-card">
+          <div class="ia-table-scroll-container">
+            <div id="ia-table-container">
+              <div class="ia-loading-state">
+                <div class="btn-spinner"></div>
+                <p>Fetching official university CIE table from student portal...</p>
+              </div>
+            </div>
           </div>
-        </div>
-
-        <!-- Raw Tabular View Container -->
-        <div id="ia-raw-table-container" class="ia-raw-table-wrapper hidden">
-          <div class="raw-table-header">
-            <h4>Official University Table Format</h4>
-            <span class="raw-table-note">Direct from studentportal.universitysolutions.in</span>
-          </div>
-          <div id="ia-raw-table-content" class="raw-table-scroll"></div>
         </div>
       </section>
     </div>
@@ -1031,7 +1030,7 @@
   <script src="js/api.js"></script>
   <script src="js/calendar.js"></script>
   <script src="js/summary.js?v=7"></script>
-  <script src="js/iamarks.js?v=6"></script>
+  <script src="js/iamarks.js?v=8"></script>
   <script src="js/heatmap.js?v=6"></script>
   <script src="js/simulator.js?v=6"></script>
   <script src="js/wrapped.js?v=6"></script>

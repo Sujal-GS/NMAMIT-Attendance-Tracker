@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nmamit-attendance-v8';
+const CACHE_NAME = 'nmamit-attendance-v9';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
