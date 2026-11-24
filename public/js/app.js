@@ -112,6 +112,7 @@ const App = {
     if (window.HeatmapView) HeatmapView.init();
     if (window.Simulator) Simulator.init();
     if (window.Wrapped) Wrapped.init();
+    if (window.IaMarksView) IaMarksView.init();
 
     // Check PWA installation state to hide Install card if already installed
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches 
@@ -126,6 +127,9 @@ const App = {
     // Initial render: Load active tabs immediately
     CalendarView.render();
     SummaryView.load();
+    if (window.IaMarksView) {
+      IaMarksView.load();
+    }
     
     // Background load Heatmap without competing with initial view
     if (window.HeatmapView) {
@@ -357,10 +361,11 @@ const App = {
   // Dashboard Handlers & Tab Switching
   // --------------------------------------------------------------------------
   bindDashboardEvents() {
-    // Tab switching (Calendar, Subject Planner, Activity Matrix)
+    // Tab switching (Calendar, Subject Planner, Activity Matrix, IA Marks)
     const tabCalBtn = document.getElementById('tab-btn-calendar');
     const tabSumBtn = document.getElementById('tab-btn-summary');
     const tabHeatBtn = document.getElementById('tab-btn-heatmap');
+    const tabIaBtn = document.getElementById('tab-btn-iamarks');
 
     if (tabCalBtn) {
       tabCalBtn.addEventListener('click', () => this.switchTab('tab-calendar'));
@@ -370,6 +375,9 @@ const App = {
     }
     if (tabHeatBtn) {
       tabHeatBtn.addEventListener('click', () => this.switchTab('tab-heatmap'));
+    }
+    if (tabIaBtn) {
+      tabIaBtn.addEventListener('click', () => this.switchTab('tab-iamarks'));
     }
 
     // Refresh sync button
@@ -397,12 +405,13 @@ const App = {
         try {
           await Promise.all([
             CalendarView.render(),
-            SummaryView.load()
+            SummaryView.load(),
+            window.IaMarksView ? IaMarksView.load() : Promise.resolve()
           ]);
           if (window.HeatmapView) {
             HeatmapView.load();
           }
-          this.showToast('Attendance data synchronized!', 'success');
+          this.showToast('Attendance & IA data synchronized!', 'success');
         } finally {
           refreshBtn.disabled = false;
           if (refreshIcon) {
@@ -497,7 +506,7 @@ const App = {
 
   switchTab(tabId) {
     this.currentTab = tabId;
-    const tabs = ['tab-calendar', 'tab-summary', 'tab-heatmap'];
+    const tabs = ['tab-calendar', 'tab-summary', 'tab-heatmap', 'tab-iamarks'];
     
     tabs.forEach(tId => {
       const tabEl = document.getElementById(tId);
@@ -518,6 +527,8 @@ const App = {
       HeatmapView.render();
     } else if (tabId === 'tab-calendar') {
       CalendarView.render();
+    } else if (tabId === 'tab-iamarks' && window.IaMarksView) {
+      IaMarksView.render();
     }
   },
 

@@ -882,7 +882,151 @@ app.post('/api/attendance-month', authMiddleware, async (req, res) => {
   res.json({ success: true, monthData: results });
 });
 
-// 8. Logout
+// 8. IA Marks (Continuous Internal Evaluation)
+app.get('/api/ia-marks', authMiddleware, async (req, res) => {
+  const session = req.userSession;
+
+  if (session.isDemo) {
+    const demoIa = [
+      {
+        subcode: 'CB3001-1',
+        subname: 'Information and Network Security',
+        tests: [
+          { name: 'Test 1', marks: '27.5', max: '30' },
+          { name: 'Test 2', marks: '28.0', max: '30' },
+          { name: 'Assessment', marks: '19.0', max: '20' }
+        ],
+        total: '46.8',
+        maxTotal: '50',
+        percentage: 93.6,
+        status: 'Outstanding'
+      },
+      {
+        subcode: 'CB3002-1',
+        subname: 'Database Management Systems',
+        tests: [
+          { name: 'Test 1', marks: '26.0', max: '30' },
+          { name: 'Test 2', marks: '27.0', max: '30' },
+          { name: 'Assessment', marks: '18.5', max: '20' }
+        ],
+        total: '45.0',
+        maxTotal: '50',
+        percentage: 90.0,
+        status: 'Outstanding'
+      },
+      {
+        subcode: 'CB3003-1',
+        subname: 'Design & Analysis of Algorithms',
+        tests: [
+          { name: 'Test 1', marks: '25.0', max: '30' },
+          { name: 'Test 2', marks: '24.5', max: '30' },
+          { name: 'Assessment', marks: '17.0', max: '20' }
+        ],
+        total: '41.8',
+        maxTotal: '50',
+        percentage: 83.6,
+        status: 'Good'
+      },
+      {
+        subcode: 'CB3004-1',
+        subname: 'Computer Networks & Protocols',
+        tests: [
+          { name: 'Test 1', marks: '28.0', max: '30' },
+          { name: 'Test 2', marks: '29.0', max: '30' },
+          { name: 'Assessment', marks: '19.5', max: '20' }
+        ],
+        total: '48.0',
+        maxTotal: '50',
+        percentage: 96.0,
+        status: 'Exemplary'
+      },
+      {
+        subcode: 'CB3005-1',
+        subname: 'Software Engineering & Agile',
+        tests: [
+          { name: 'Test 1', marks: '23.5', max: '30' },
+          { name: 'Test 2', marks: '25.0', max: '30' },
+          { name: 'Assessment', marks: '16.0', max: '20' }
+        ],
+        total: '40.3',
+        maxTotal: '50',
+        percentage: 80.6,
+        status: 'Good'
+      }
+    ];
+
+    return res.json({
+      success: true,
+      error_code: 0,
+      data: demoIa,
+      isDemo: true
+    });
+  }
+
+  try {
+    let rawHtml = '';
+    let parsedData = null;
+
+    // Try viewIaMarksNew first
+    try {
+      const resp = await portalFetch(
+        `app.php?a=viewIaMarksNew&univcode=${session.univcode}`,
+        { method: 'GET' },
+        session,
+        8000
+      );
+      const text = await resp.text();
+      let json = null;
+      try { json = JSON.parse(text); } catch {}
+
+      if (json && json.data) {
+        if (typeof json.data.marks === 'string') {
+          rawHtml = json.data.marks;
+        } else if (Array.isArray(json.data.marks)) {
+          parsedData = json.data.marks;
+        } else if (Array.isArray(json.data)) {
+          parsedData = json.data;
+        }
+      }
+    } catch (e1) {
+      console.warn('viewIaMarksNew failed:', e1.message);
+    }
+
+    // Try elementWiseMarks as fallback if nothing was returned
+    if (!rawHtml && (!parsedData || parsedData.length === 0)) {
+      try {
+        const resp2 = await portalFetch(
+          `app.php?a=elementWiseMarks&univcode=${session.univcode}`,
+          { method: 'GET' },
+          session,
+          8000
+        );
+        const text2 = await resp2.text();
+        let json2 = null;
+        try { json2 = JSON.parse(text2); } catch {}
+        if (json2 && json2.data) {
+          if (Array.isArray(json2.data.marks)) {
+            parsedData = json2.data.marks;
+          }
+        }
+      } catch (e2) {
+        console.warn('elementWiseMarks failed:', e2.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      error_code: 0,
+      rawHtml: rawHtml || '',
+      data: parsedData || []
+    });
+  } catch (err) {
+    console.error('Error fetching IA marks:', err.message);
+    res.status(500).json({ success: false, message: 'Failed to fetch IA marks: ' + err.message });
+  }
+});
+
+// 9. Logout
 app.post('/api/logout', (req, res) => {
   const sessionId = req.headers['x-session-id'] || req.body.sessionId;
   if (sessionId) {

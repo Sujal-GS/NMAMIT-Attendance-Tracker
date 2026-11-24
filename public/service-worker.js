@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nmamit-attendance-v6';
+const CACHE_NAME = 'nmamit-attendance-v7';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -9,6 +9,7 @@ const STATIC_ASSETS = [
   '/js/summary.js',
   '/js/heatmap.js',
   '/js/simulator.js',
+  '/js/iamarks.js',
   '/js/wrapped.js',
   '/js/dropdown.js',
   '/manifest.json'

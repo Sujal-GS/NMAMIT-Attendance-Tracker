@@ -192,6 +192,11 @@ const API = {
       method: 'POST',
       body: JSON.stringify({ year, month })
     });
+  },
+
+  // 9. Fetch IA Marks (Continuous Internal Evaluation)
+  async getIaMarks() {
+    return this.request('/api/ia-marks');
   }
 };
 

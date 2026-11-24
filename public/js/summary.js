@@ -27,14 +27,23 @@ const SummaryView = {
       });
     });
 
-    // Subject search input
-    const searchInput = document.getElementById('subject-search-input');
-    if (searchInput) {
-      searchInput.addEventListener('input', (e) => {
-        this.searchQuery = e.target.value.toLowerCase().trim();
-        this.render();
-      });
+    // Absent modal close buttons and backdrop
+    const closeAbsentBtn = document.getElementById('btn-close-absent');
+    const absentBackdrop = document.getElementById('absent-modal-backdrop');
+    if (closeAbsentBtn) {
+      closeAbsentBtn.addEventListener('click', () => this.closeAbsentModal());
     }
+    if (absentBackdrop) {
+      absentBackdrop.addEventListener('click', () => this.closeAbsentModal());
+    }
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const modal = document.getElementById('absent-dates-modal');
+        if (modal && !modal.classList.contains('hidden')) {
+          this.closeAbsentModal();
+        }
+      }
+    });
   },
 
   async load() {
@@ -115,7 +124,6 @@ const SummaryView = {
   showOnlyDanger: false,
 
   render() {
-    this.renderDangerRadar();
     this.renderAggregateHero();
     this.renderSubjectsGrid();
     if (window.Simulator && typeof window.Simulator.populateSubjects === 'function') {
@@ -124,106 +132,11 @@ const SummaryView = {
   },
 
   renderDangerRadar() {
+    // Disabled as requested: Alert system removed from top of Subject Planner
     const radarContainer = document.getElementById('danger-radar-container');
-    if (!radarContainer) return;
-
-    const criticalList = [];
-    const warningList = [];
-
-    this.rawSubjects.forEach(s => {
-      const cond = parseInt(s.conducted ?? s.ftotalclass ?? 0, 10);
-      const att = parseInt(s.attended ?? s.fpresentclass ?? 0, 10);
-      const pct = cond > 0 ? (att / cond) * 100 : 100;
-      const subName = s.fsubname || s.name || s.fsubcode || s.code || 'Subject';
-
-      if (pct < 75) {
-        const needed75 = Math.max(1, Math.ceil(((0.75 * cond) - att) / 0.25));
-        criticalList.push({ ...s, subName, pct, needed75 });
-      } else if (pct < 85) {
-        const needed85 = Math.max(1, Math.ceil(((0.85 * cond) - att) / 0.15));
-        warningList.push({ ...s, subName, pct, needed85 });
-      }
-    });
-
-    if (criticalList.length === 0 && warningList.length === 0) {
+    if (radarContainer) {
       radarContainer.innerHTML = '';
       radarContainer.classList.add('hidden');
-      return;
-    }
-
-    radarContainer.classList.remove('hidden');
-    const isCritical = criticalList.length > 0;
-
-    let itemsHtml = '';
-    criticalList.forEach(item => {
-      itemsHtml += `
-        <div class="radar-item radar-item-critical">
-          <div class="radar-item-top">
-            <span class="radar-chip chip-critical">EXAM BARRED (&lt;75%)</span>
-            <span class="radar-pct text-rose">${item.pct.toFixed(1)}%</span>
-          </div>
-          <div class="radar-item-body">
-            <div class="radar-subname">${item.subName}</div>
-          </div>
-          <div class="radar-item-footer">
-            <div class="radar-prescription radar-pres-critical">
-              <span class="radar-pres-icon">⚡</span>
-              <span>Attend next <strong>${item.needed75}</strong> consecutive class${item.needed75 > 1 ? 'es' : ''} to reach 75%</span>
-            </div>
-          </div>
-        </div>
-      `;
-    });
-
-    warningList.forEach(item => {
-      itemsHtml += `
-        <div class="radar-item radar-item-warning">
-          <div class="radar-item-top">
-            <span class="radar-chip chip-warning">BUFFER ALERT (&lt;85%)</span>
-            <span class="radar-pct text-amber">${item.pct.toFixed(1)}%</span>
-          </div>
-          <div class="radar-item-body">
-            <div class="radar-subname">${item.subName}</div>
-          </div>
-          <div class="radar-item-footer">
-            <div class="radar-prescription radar-pres-warning">
-              <span class="radar-pres-icon">⚠️</span>
-              <span>Attend next <strong>${item.needed85}</strong> class${item.needed85 > 1 ? 'es' : ''} to regain 85% threshold</span>
-            </div>
-          </div>
-        </div>
-      `;
-    });
-
-    radarContainer.innerHTML = `
-      <div class="danger-radar-card ${isCritical ? 'radar-danger-theme' : 'radar-warning-theme'}">
-        <div class="radar-header">
-          <div class="radar-header-left">
-            <span class="radar-pulse-icon">${isCritical ? '🚨' : '⚠️'}</span>
-            <div>
-              <div class="radar-title">Low-Attendance Warning Radar</div>
-              <div class="radar-subtitle">
-                ${criticalList.length > 0 ? `${criticalList.length} subject${criticalList.length > 1 ? 's' : ''} in critical zone (&lt;75%)` : `${warningList.length} subject${warningList.length > 1 ? 's' : ''} below 85% honor threshold`}
-              </div>
-            </div>
-          </div>
-          <button type="button" id="btn-toggle-danger-filter" class="btn-radar-filter ${this.showOnlyDanger ? 'active' : ''}">
-            ${this.showOnlyDanger ? 'Show All Subjects' : 'Filter At-Risk Only'}
-          </button>
-        </div>
-        <div class="radar-list">
-          ${itemsHtml}
-        </div>
-      </div>
-    `;
-
-    const filterBtn = document.getElementById('btn-toggle-danger-filter');
-    if (filterBtn) {
-      filterBtn.addEventListener('click', () => {
-        this.showOnlyDanger = !this.showOnlyDanger;
-        this.renderSubjectsGrid();
-        this.renderDangerRadar();
-      });
     }
   },
 
@@ -440,8 +353,13 @@ const SummaryView = {
               <div class="progress-fill" style="width: ${Math.min(100, pct)}%; background-color: ${colorVar};"></div>
             </div>
             <div class="progress-stats-line">
-              <span>Attended: <strong>${attended}</strong> / ${conducted}</span>
-              <span>Missed: <strong>${missed}</strong> classes</span>
+              <span class="stat-pill-attended">Attended: <strong>${attended}</strong> / ${conducted}</span>
+              <button type="button" class="stat-pill-missed ${missed > 0 ? 'has-absences' : 'zero-absences'}" 
+                onclick="SummaryView.showAbsentDates('${code}', '${encodeURIComponent(name)}', ${missed})"
+                title="${missed > 0 ? `Click to view all ${missed} absent dates for this subject` : '100% Attendance in this course'}">
+                <span>Missed: <strong>${missed}</strong> class${missed !== 1 ? 'es' : ''}</span>
+                ${missed > 0 ? '<span class="absent-pill-tag">View Dates &rarr;</span>' : '<span class="absent-pill-tag tag-perfect">✓ 100%</span>'}
+              </button>
             </div>
           </div>
 
@@ -483,6 +401,191 @@ const SummaryView = {
   resetSimulation(subCode) {
     this.simulatedDeltas.delete(subCode);
     this.render();
+  },
+
+  showAbsentDates(subCode, subNameEncoded, missedCount) {
+    const subName = decodeURIComponent(subNameEncoded);
+    const modal = document.getElementById('absent-dates-modal');
+    if (!modal) return;
+
+    const subCodeEl = document.getElementById('absent-modal-subcode');
+    const subNameEl = document.getElementById('absent-modal-subname');
+    const titleEl = document.getElementById('absent-modal-title');
+    const listContainer = document.getElementById('absent-modal-list');
+
+    if (subCodeEl) subCodeEl.textContent = `// ${subCode}`;
+    if (titleEl) titleEl.textContent = 'Absent Classes Log';
+    if (subNameEl) subNameEl.textContent = `${subName} • ${missedCount} Missed Class${missedCount !== 1 ? 'es' : ''}`;
+
+    if (listContainer) {
+      listContainer.innerHTML = '<div class="empty-state"><div class="btn-spinner"></div><p>Scanning semester attendance records...</p></div>';
+    }
+    modal.classList.remove('hidden');
+
+    setTimeout(() => {
+      this.populateAbsentDates(subCode, subName, missedCount);
+    }, 80);
+  },
+
+  populateAbsentDates(subCode, subName, missedCount) {
+    const listContainer = document.getElementById('absent-modal-list');
+    if (!listContainer) return;
+
+    if (missedCount === 0) {
+      listContainer.innerHTML = `
+        <div class="absent-empty-perfect">
+          <div class="perfect-trophy-icon">🏆</div>
+          <h4 class="perfect-headline">Zero Absences!</h4>
+          <p class="perfect-subtext">You have attended 100% of the conducted classes for <strong>${window.escapeHtml ? window.escapeHtml(subName) : subName}</strong>. Keep up the flawless streak!</p>
+        </div>
+      `;
+      return;
+    }
+
+    const absentRecords = [];
+    const allDaysMap = new Map();
+
+    // 1. HeatmapView semester data
+    if (window.HeatmapView && window.HeatmapView.semesterData) {
+      for (const [dateStr, info] of window.HeatmapView.semesterData.entries()) {
+        allDaysMap.set(dateStr, info);
+      }
+    }
+
+    // 2. CalendarView month data
+    if (window.CalendarView && window.CalendarView.monthDataCache) {
+      for (const monthObj of window.CalendarView.monthDataCache.values()) {
+        if (monthObj && typeof monthObj === 'object') {
+          for (const [dateStr, info] of Object.entries(monthObj)) {
+            if (!allDaysMap.has(dateStr)) {
+              allDaysMap.set(dateStr, info);
+            }
+          }
+        }
+      }
+    }
+
+    // 3. sessionStorage
+    try {
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const k = sessionStorage.key(i);
+        if (k && k.startsWith('att_month_')) {
+          const parsed = JSON.parse(sessionStorage.getItem(k));
+          if (parsed && typeof parsed === 'object') {
+            for (const [dateStr, info] of Object.entries(parsed)) {
+              if (!allDaysMap.has(dateStr)) {
+                allDaysMap.set(dateStr, info);
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {}
+
+    // Match code
+    const cleanTargetCode = subCode.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+
+    for (const [dateStr, dayInfo] of allDaysMap.entries()) {
+      if (dayInfo && Array.isArray(dayInfo.classes)) {
+        dayInfo.classes.forEach(c => {
+          const cCode = (c.fsubcode || c.code || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+          const isMatch = cCode === cleanTargetCode || (c.fsubcode && c.fsubcode.trim() === subCode.trim());
+          if (isMatch) {
+            const isPres = c.fpresent === '1' || c.fpresent === 1 || String(c.fpresent).trim().toUpperCase() === 'P' || String(c.fpresent).toLowerCase() === 'present';
+            if (!isPres) {
+              const dObj = new Date(dateStr + 'T00:00:00');
+              absentRecords.push({
+                dateStr,
+                dateObj: dObj,
+                period: c.fperiod || '1',
+                hours: parseInt(c.fnoclass || '1', 10),
+                teacher: c.fteachname || ''
+              });
+            }
+          }
+        });
+      }
+    }
+
+    // Sort descending (most recent first)
+    absentRecords.sort((a, b) => b.dateStr.localeCompare(a.dateStr));
+
+    if (absentRecords.length === 0) {
+      listContainer.innerHTML = `
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 14 14"></polyline>
+          </svg>
+          <p>You have missed <strong>${missedCount} class${missedCount > 1 ? 'es' : ''}</strong> in this subject. Detailed timetable dates are still loading from the portal.</p>
+          <button class="btn-primary" style="margin-top: 10px;" onclick="CalendarView.render(); App.switchTab('tab-calendar'); SummaryView.closeAbsentModal();">Inspect in Calendar</button>
+        </div>
+      `;
+      return;
+    }
+
+    let itemsHtml = '';
+    absentRecords.forEach(rec => {
+      const formattedDate = rec.dateObj.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+
+      itemsHtml += `
+        <div class="absent-date-card">
+          <div class="absent-card-left">
+            <div class="absent-calendar-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+            </div>
+            <div class="absent-details">
+              <span class="absent-date-text">${formattedDate}</span>
+              <span class="absent-period-meta">Period ${rec.period} • ${rec.hours} Hour${rec.hours > 1 ? 's' : ''}${rec.teacher ? ` • Prof. ${window.escapeHtml ? window.escapeHtml(rec.teacher) : rec.teacher}` : ''}</span>
+            </div>
+          </div>
+          <div class="absent-card-right">
+            <span class="absent-badge-pill">Absent</span>
+            <button type="button" class="btn-jump-calendar" onclick="SummaryView.jumpToDate('${rec.dateStr}')" title="Inspect this date in Calendar">
+              <span>View Day</span>
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+          </div>
+        </div>
+      `;
+    });
+
+    listContainer.innerHTML = `
+      <div class="absent-records-summary">
+        <span>Recorded <strong>${absentRecords.length}</strong> missed class${absentRecords.length > 1 ? 'es' : ''}</span>
+      </div>
+      <div class="absent-records-list">
+        ${itemsHtml}
+      </div>
+    `;
+  },
+
+  jumpToDate(dateStr) {
+    this.closeAbsentModal();
+    if (window.App) {
+      App.switchTab('tab-calendar');
+      const [y, m, d] = dateStr.split('-').map(Number);
+      CalendarView.currentYear = y;
+      CalendarView.currentMonth = m - 1;
+      CalendarView.selectedDateStr = dateStr;
+      CalendarView.render();
+      CalendarView.loadDateDetails(dateStr);
+    }
+  },
+
+  closeAbsentModal() {
+    const modal = document.getElementById('absent-dates-modal');
+    if (modal) modal.classList.add('hidden');
   }
 };
 

@@ -356,6 +356,17 @@
           <span class="tab-title">Activity Matrix</span>
           <span class="tab-badge" id="heatmap-tab-badge">Streaks</span>
         </button>
+        <button class="tab-btn" id="tab-btn-iamarks" data-tab="tab-iamarks">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+          <span class="tab-title">IA Marks</span>
+          <span class="tab-badge" id="iamarks-tab-badge">CIE</span>
+        </button>
       </nav>
 
       <!-- TAB 1 CONTENT: CALENDAR & DAILY BREAKDOWN -->
@@ -482,9 +493,6 @@
 
       <!-- TAB 2 CONTENT: SUBJECT SUMMARY & 85% BUNK CALCULATOR -->
       <section id="tab-summary" class="tab-content">
-        <!-- Low-Attendance Warning Radar ("Danger Zone") Container -->
-        <div id="danger-radar-container" class="danger-radar-wrapper hidden"></div>
-
         <!-- Semester Aggregates Hero Banner -->
         <div class="summary-hero-card">
           <div class="hero-left">
@@ -802,6 +810,87 @@
         <!-- Global Floating Heatmap Tooltip (Positioned outside scroll area to avoid clipping) -->
         <div id="heatmap-tooltip" class="heatmap-tooltip hidden" role="tooltip"></div>
       </section>
+
+      <!-- TAB 4 CONTENT: IA MARKS & CIE EVALUATION -->
+      <section id="tab-iamarks" class="tab-content">
+        <!-- IA Aggregates Hero Banner -->
+        <div class="summary-hero-card ia-hero-card">
+          <div class="hero-left">
+            <div class="aggregate-gauge-wrapper">
+              <svg class="radial-gauge" viewBox="0 0 120 120">
+                <circle class="gauge-bg" cx="60" cy="60" r="52"></circle>
+                <circle class="gauge-progress" id="ia-gauge-bar" cx="60" cy="60" r="52"></circle>
+              </svg>
+              <div class="gauge-inner-text">
+                <span id="ia-overall-percentage" class="gauge-percentage">--%</span>
+                <span class="gauge-label">Average IA</span>
+              </div>
+            </div>
+            <div class="hero-status-message">
+              <div class="status-chip" id="ia-status-chip">
+                <span class="chip-indicator"></span>
+                <span id="ia-status-text">Internal Assessment</span>
+              </div>
+              <h2 id="ia-headline" class="hero-headline">CIE Evaluation Marks</h2>
+              <p id="ia-subtext" class="hero-description">Continuous Internal Evaluation test components, assignments & normalized scores.</p>
+            </div>
+          </div>
+
+          <div class="hero-right">
+            <div class="aggregate-metric-box">
+              <span class="amb-label">Scored Total</span>
+              <span class="amb-val text-emerald" id="ia-total-scored">0</span>
+              <span class="amb-sub" id="ia-max-possible">Out of 0 marks</span>
+            </div>
+            <div class="aggregate-metric-box">
+              <span class="amb-label">Evaluated Courses</span>
+              <span class="amb-val" id="ia-courses-count">0</span>
+              <span class="amb-sub">Subjects with published IA</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Controls / Search Bar -->
+        <div class="subjects-toolbar">
+          <div class="toolbar-left">
+            <h3 class="section-title">Course-wise IA Breakdown</h3>
+            <span class="count-badge" id="ia-subjects-count-badge">0 Subjects</span>
+          </div>
+          <div class="toolbar-right">
+            <div class="search-input-wrapper">
+              <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input type="text" id="ia-search-input" class="search-input" placeholder="Search subject or code...">
+            </div>
+            <button type="button" id="btn-refresh-ia" class="icon-action-btn" title="Reload IA Marks from Portal">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+              </svg>
+              <span class="btn-label-desktop">Refresh</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Subjects Grid for IA -->
+        <div id="ia-cards-grid" class="subjects-grid">
+          <div class="empty-state" style="grid-column: 1 / -1;">
+            <div class="btn-spinner"></div>
+            <p>Fetching official IA marks from student portal...</p>
+          </div>
+        </div>
+
+        <!-- Raw Tabular View Container -->
+        <div id="ia-raw-table-container" class="ia-raw-table-wrapper hidden">
+          <div class="raw-table-header">
+            <h4>Official University Table Format</h4>
+            <span class="raw-table-note">Direct from studentportal.universitysolutions.in</span>
+          </div>
+          <div id="ia-raw-table-content" class="raw-table-scroll"></div>
+        </div>
+      </section>
     </div>
   </div>
 
@@ -842,6 +931,30 @@
           </svg>
           <span>Copy Stats Text</span>
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ABSENT CLASSES LOG MODAL -->
+  <div id="absent-dates-modal" class="credits-modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="absent-modal-title">
+    <div class="credits-modal-backdrop" id="absent-modal-backdrop"></div>
+    <div class="credits-modal-card absent-modal-card">
+      <div class="credits-modal-header">
+        <div>
+          <span class="section-tag" id="absent-modal-subcode">// SUBJECT LOG</span>
+          <h3 id="absent-modal-title" class="credits-modal-title">Absent Classes Log</h3>
+          <p id="absent-modal-subname" class="absent-modal-subtitle">Course Name</p>
+        </div>
+        <button type="button" id="btn-close-absent" class="credits-close-btn" aria-label="Close absent dates dialog">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="absent-modal-body" id="absent-modal-list">
+        <!-- Dynamically populated list of absent dates -->
       </div>
     </div>
   </div>
@@ -918,6 +1031,7 @@
   <script src="js/api.js"></script>
   <script src="js/calendar.js"></script>
   <script src="js/summary.js?v=6"></script>
+  <script src="js/iamarks.js?v=6"></script>
   <script src="js/heatmap.js?v=6"></script>
   <script src="js/simulator.js?v=6"></script>
   <script src="js/wrapped.js?v=6"></script>
