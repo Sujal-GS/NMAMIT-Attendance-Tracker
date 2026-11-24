@@ -5503,6 +5503,15 @@ body::before {
   margin: 0 auto;
 }
 
+.search-icon,
+svg.search-icon {
+  width: 16px !important;
+  height: 16px !important;
+  max-width: 16px !important;
+  max-height: 16px !important;
+  flex-shrink: 0;
+}
+
 /* IA Marks (Continuous Internal Evaluation) View Aesthetics */
 .ia-hero-card {
   margin-bottom: 24px;
