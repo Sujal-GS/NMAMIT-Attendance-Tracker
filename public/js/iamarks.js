@@ -37,7 +37,7 @@ const IaMarksView = {
           }
           await this.load();
           if (window.App && typeof window.App.showToast === 'function') {
-            window.App.showToast('Official IA Marks updated!', 'success');
+            window.App.showToast('IA Marks updated!', 'success');
           }
         } finally {
           refreshBtn.disabled = false;
@@ -53,7 +53,7 @@ const IaMarksView = {
       tableContainer.innerHTML = `
         <div class="ia-loading-state">
           <div class="btn-spinner"></div>
-          <p>Fetching official university CIE table from student portal...</p>
+          <p>Fetching CIE table from student portal...</p>
         </div>
       `;
     }
@@ -221,17 +221,17 @@ const IaMarksView = {
             <line x1="12" y1="8" x2="12" y2="12"></line>
             <line x1="12" y1="16" x2="12.01" y2="16"></line>
           </svg>
-          <p>${this.searchQuery ? `No courses match "${this.searchQuery}".` : 'No official CIE marks published on university portal yet.'}</p>
+          <p>${this.searchQuery ? `No courses match "${this.searchQuery}".` : 'No CIE marks published on university portal yet.'}</p>
         </div>
       `;
       return;
     }
 
     // Determine columns to display
-    // Exclude redundant columns like "Sl. No." or "Sem" if we render our own clean "#" column
+    // Exclude redundant columns like "Sl. No.", "Sem", and "Eligibility"
     const displayHeaders = this.headers.filter(h => {
       const lower = h.toLowerCase();
-      return !/^sl|^sem$/i.test(lower);
+      return !/^sl|^sem$|elig/i.test(lower);
     });
 
     // Build Table HTML
@@ -278,18 +278,8 @@ const IaMarksView = {
           const displayVal = !isNaN(num) ? num.toFixed(2) : (val || '—');
           tableHtml += `
             <td class="col-center col-final">
-              <div class="ia-final-pill">
-                <strong>${displayVal}</strong>
-                <span class="ia-denom">/ 50</span>
-              </div>
-            </td>
-          `;
-        } else if (/elig/i.test(lower)) {
-          const isElig = !val || /elig|yes|ok|true/i.test(val);
-          tableHtml += `
-            <td class="col-center">
-              <span class="ia-status-pill ${isElig ? 'pill-eligible' : 'pill-warning'}">
-                ${val || 'Eligible'}
+              <span class="ia-final-score">
+                <strong>${displayVal}</strong><span class="ia-denom">/50</span>
               </span>
             </td>
           `;
@@ -338,10 +328,10 @@ const IaMarksView = {
     const countEl = document.getElementById('ia-hero-courses-count');
     const highestEl = document.getElementById('ia-hero-highest-score');
 
-    if (avgScoreEl) avgScoreEl.textContent = finalCount > 0 ? `${avgFinal.toFixed(1)} / 50` : '—';
-    if (avgPctEl) avgPctEl.textContent = finalCount > 0 ? `${avgPct.toFixed(1)}% CIE Average` : 'CIE in progress';
-    if (countEl) countEl.textContent = `${rows.length} Courses`;
-    if (highestEl) highestEl.textContent = highest > 0 ? `${highest.toFixed(1)} / 50` : '—';
+    if (avgScoreEl) avgScoreEl.innerHTML = finalCount > 0 ? `${avgFinal.toFixed(1)}<span class="amb-denom">/50</span>` : '—';
+    if (avgPctEl) avgPctEl.textContent = finalCount > 0 ? `${avgPct.toFixed(1)}% Average` : 'CIE in progress';
+    if (countEl) countEl.textContent = String(rows.length);
+    if (highestEl) highestEl.innerHTML = highest > 0 ? `${highest.toFixed(1)}<span class="amb-denom">/50</span>` : '—';
   }
 };
 

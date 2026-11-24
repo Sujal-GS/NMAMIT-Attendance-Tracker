@@ -5625,30 +5625,42 @@ svg.search-icon {
 }
 
 .ia-modern-table .col-final {
-  min-width: 110px;
+  min-width: 90px;
   text-align: center;
+  white-space: nowrap;
 }
 
-.ia-final-pill {
+.ia-final-score {
   display: inline-flex;
   align-items: baseline;
-  gap: 3px;
-  padding: 4px 12px;
-  border-radius: var(--radius-full);
-  background: rgba(16, 185, 129, 0.12);
-  border: 1px solid rgba(16, 185, 129, 0.3);
-  color: #34d399;
+  gap: 2px;
   font-family: var(--font-mono);
+  white-space: nowrap;
 }
 
-.ia-final-pill strong {
+.ia-final-score strong {
   font-size: 0.95rem;
   font-weight: 800;
+  color: #34d399;
+  text-shadow: 0 0 10px rgba(52, 211, 153, 0.35);
+  letter-spacing: -0.01em;
+  line-height: 1;
 }
 
-.ia-final-pill .ia-denom {
-  font-size: 0.7rem;
-  opacity: 0.7;
+.ia-final-score .ia-denom {
+  font-size: 0.725rem;
+  color: var(--foreground-muted);
+  opacity: 0.75;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.amb-denom {
+  font-size: 0.725rem;
+  font-weight: 500;
+  color: var(--foreground-muted);
+  opacity: 0.8;
+  margin-left: 2px;
 }
 
 .ia-modern-table .score-num {
@@ -5673,27 +5685,6 @@ svg.search-icon {
   border-radius: 4px;
 }
 
-.ia-status-pill {
-  display: inline-block;
-  padding: 3px 10px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  border-radius: var(--radius-full);
-  letter-spacing: 0.02em;
-}
-
-.ia-status-pill.pill-eligible {
-  background: rgba(16, 185, 129, 0.1);
-  color: #34d399;
-  border: 1px solid rgba(16, 185, 129, 0.25);
-}
-
-.ia-status-pill.pill-warning {
-  background: rgba(245, 158, 11, 0.1);
-  color: #fbbf24;
-  border: 1px solid rgba(245, 158, 11, 0.25);
-}
-
 .ia-loading-state {
   padding: 56px 24px;
   text-align: center;
@@ -5703,5 +5694,65 @@ svg.search-icon {
 .ia-loading-state p {
   margin-top: 14px;
   font-size: 0.875rem;
+}
+
+@media (max-width: 640px) {
+  .ia-hero-card .hero-right {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    width: 100%;
+    margin-top: 14px;
+  }
+  .ia-hero-card .aggregate-metric-box {
+    padding: 10px 4px;
+    text-align: center;
+    align-items: center;
+    border-radius: var(--radius-md);
+  }
+  .ia-hero-card .amb-label {
+    font-size: 0.625rem;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+  .ia-hero-card .amb-val {
+    font-size: 1.15rem;
+    white-space: nowrap;
+    line-height: 1.15;
+    margin: 2px 0;
+  }
+  .ia-hero-card .amb-sub {
+    font-size: 0.6rem;
+    white-space: nowrap;
+  }
+  .ia-hero-card .hero-left {
+    flex-direction: column;
+    text-align: center;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+  }
+  .ia-hero-card .hero-headline {
+    font-size: 1.15rem;
+    text-align: center;
+  }
+  .ia-hero-card .hero-description {
+    font-size: 0.75rem;
+    text-align: center;
+  }
+  .ia-modern-table th,
+  .ia-modern-table td {
+    padding: 10px 10px;
+    font-size: 0.775rem;
+  }
+  .ia-modern-table .col-name {
+    min-width: 160px;
+  }
+  .ia-final-score strong {
+    font-size: 0.875rem;
+  }
+  .ia-final-score .ia-denom {
+    font-size: 0.65rem;
+  }
 }
 
