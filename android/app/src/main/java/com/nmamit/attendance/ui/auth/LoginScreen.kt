@@ -9,7 +9,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -392,47 +391,6 @@ fun LoginScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
-
-                val demoInteraction = remember { MutableInteractionSource() }
-                val demoPressed by demoInteraction.collectIsPressedAsState()
-                val demoScale by animateFloatAsState(
-                    targetValue = if (demoPressed && !uiState.isLoading) 0.96f else 1f,
-                    animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow),
-                    label = "demoScale"
-                )
-
-                // Secondary Frosted Glass Demo Button
-                OutlinedButton(
-                    onClick = { viewModel.loginAsDemo() },
-                    enabled = !uiState.isLoading,
-                    interactionSource = demoInteraction,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(40.dp)
-                        .fluidEnter(delayMs = 215, offsetYDp = 10f)
-                        .graphicsLayer {
-                            scaleX = demoScale
-                            scaleY = demoScale
-                        },
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Color.White.copy(alpha = 0.07f),
-                        contentColor = Foreground
-                    ),
-                    border = BorderStroke(
-                        1.dp,
-                        Brush.verticalGradient(listOf(GlassInputTopRim, Color.White.copy(alpha = 0.16f)))
-                    )
-                ) {
-                    Text(
-                        text = "Explore Demo Mode",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Foreground
-                    )
-                }
-
                 Spacer(modifier = Modifier.height(20.dp))
                 HorizontalDivider(color = Color.White.copy(alpha = 0.09f))
                 Spacer(modifier = Modifier.height(16.dp))
@@ -441,7 +399,7 @@ fun LoginScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .fluidEnter(delayMs = 240, offsetYDp = 8f),
+                        .fluidEnter(delayMs = 215, offsetYDp = 8f),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Row(
@@ -467,7 +425,7 @@ fun LoginScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Sujal G S & Lakshminarayanan P S",
+                            text = "Sujal G S",
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Foreground.copy(alpha = 0.9f)
@@ -555,7 +513,7 @@ private fun DeveloperCreditsOverlay(
                 verticalAlignment = Alignment.Top
             ) {
                 Column {
-                    SectionTag("// DEVELOPERS")
+                    SectionTag("// DEVELOPER")
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "Engineering Credits",
@@ -589,11 +547,7 @@ private fun DeveloperCreditsOverlay(
                     withStyle(SpanStyle(color = Foreground, fontWeight = FontWeight.Bold)) {
                         append("Sujal G S")
                     }
-                    append(" and ")
-                    withStyle(SpanStyle(color = Foreground, fontWeight = FontWeight.Bold)) {
-                        append("Lakshminarayanan P S")
-                    }
-                    append(". Connect with us on LinkedIn:")
+                    append(". Connect on LinkedIn:")
                 },
                 fontSize = 12.5.sp,
                 color = ForegroundMuted,
@@ -606,13 +560,6 @@ private fun DeveloperCreditsOverlay(
                 name = "Sujal G S",
                 handle = "linkedin.com/in/sujal-g-s",
                 onClick = { runCatching { uriHandler.openUri("https://www.linkedin.com/in/sujal-g-s/") } }
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            CreatorCard(
-                initials = "LP",
-                name = "Lakshminarayanan P S",
-                handle = "linkedin.com/in/lakshminarayanan-p-s",
-                onClick = { runCatching { uriHandler.openUri("https://www.linkedin.com/in/lakshminarayanan-p-s/") } }
             )
         }
     }

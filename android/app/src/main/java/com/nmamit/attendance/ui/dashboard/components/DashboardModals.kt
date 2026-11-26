@@ -453,7 +453,7 @@ fun AttendanceWrappedModal(
                                 textAlign = TextAlign.Center
                             )
                             Text(
-                                text = "Sujal G S and Lakshminarayanan P S",
+                                text = "Sujal G S",
                                 fontSize = 10.5.sp,
                                 color = ForegroundMuted.copy(alpha = 0.8f),
                                 textAlign = TextAlign.Center
