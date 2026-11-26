@@ -38,10 +38,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -62,13 +66,15 @@ import com.nmamit.attendance.ui.components.LiquidGlassCard
 import com.nmamit.attendance.ui.components.TechGridBackground
 import com.nmamit.attendance.ui.components.bouncyClickable
 import com.nmamit.attendance.ui.dashboard.components.AbsentDatesModal
-import com.nmamit.attendance.ui.dashboard.components.AttendanceWrappedModal
 import com.nmamit.attendance.ui.dashboard.tabs.ActivityMatrixTab
 import com.nmamit.attendance.ui.dashboard.tabs.CalendarTab
 import com.nmamit.attendance.ui.dashboard.tabs.IaMarksTab
 import com.nmamit.attendance.ui.dashboard.tabs.SubjectPlannerTab
 import com.nmamit.attendance.ui.theme.*
 import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeStyle
+import dev.chrisbanes.haze.HazeTint
+import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -87,31 +93,29 @@ private val ProfileBorderBrush = Brush.verticalGradient(
 private val HeaderActionBorderBrush = Brush.verticalGradient(
     listOf(GlassBorderSpecular.copy(alpha = 0.28f), GlassBorder)
 )
-private val GoldSpotlightOverlay = Brush.linearGradient(
-    colors = listOf(
-        GoldAccent.copy(alpha = 0.09f),
-        Color(0xFF0E0E14).copy(alpha = 0.45f)
-    )
-)
-private val GoldSpotlightTopBar = Brush.horizontalGradient(
-    colors = listOf(GoldAccent, Color(0xFFFF9F0A), Rose)
-)
-private val GoldSpotlightBorder = Brush.linearGradient(
-    colors = listOf(
-        GoldAccent.copy(alpha = 0.36f),
-        Color.White.copy(alpha = 0.14f),
-        GoldAccent.copy(alpha = 0.20f)
-    )
-)
 private val ActiveTabBgBrush = Brush.verticalGradient(
     colors = listOf(
         Color.White.copy(alpha = 0.22f),
-        TabActiveBg,
-        Color.White.copy(alpha = 0.13f)
+        Color.White.copy(alpha = 0.14f),
+        Color.White.copy(alpha = 0.10f)
     )
 )
 private val ActiveTabBorderBrush = Brush.verticalGradient(
     listOf(GlassBorderSpecular, GlassBorder)
+)
+private val DockBorderBrush = Brush.verticalGradient(
+    colors = listOf(
+        Color.White.copy(alpha = 0.30f),
+        Color.White.copy(alpha = 0.14f),
+        Color.White.copy(alpha = 0.08f)
+    )
+)
+private val BottomScrimBrush = Brush.verticalGradient(
+    colors = listOf(
+        Color.Transparent,
+        BgCanvas.copy(alpha = 0.55f),
+        BgCanvas.copy(alpha = 0.88f)
+    )
 )
 
 private class CollapsibleHeaderState {
@@ -127,7 +131,7 @@ fun DashboardScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val hazeState = remember { HazeState() }
-    val hasModalOpen = uiState.showWrappedModal || uiState.absentModalSubject != null
+    val hasModalOpen = uiState.absentModalSubject != null
     val isSyncing = uiState.isCalendarLoading || uiState.isSummaryLoading || uiState.isIaLoading || uiState.isHeatmapLoading
 
     LaunchedEffect(uiState.sessionExpired) {
@@ -137,9 +141,8 @@ fun DashboardScreen(
     }
 
     BackHandler(enabled = hasModalOpen) {
-        when {
-            uiState.showWrappedModal -> viewModel.setWrappedModalOpen(false)
-            uiState.absentModalSubject != null -> viewModel.closeAbsentModal()
+        if (uiState.absentModalSubject != null) {
+            viewModel.closeAbsentModal()
         }
     }
 
@@ -224,182 +227,169 @@ fun DashboardScreen(
 
     TechGridBackground(
         hazeState = hazeState,
-        enableHazeSource = hasModalOpen
+        enableHazeSource = true
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .then(if (hasModalOpen) Modifier.hazeSource(hazeState) else Modifier)
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .nestedScroll(headerScrollConnection)
-                .padding(horizontal = 12.dp)
-        ) {
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Fixed-height Layout: header collapse reads offsetPx ONLY during placement/graphicsLayer
-            // so HorizontalPager and all tab LazyColumns experience ZERO remeasurements while scrolling.
-            Layout(
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Main scrollable dashboard surface acts as Haze source for the floating iOS dock & modals
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .clipToBounds(),
-                content = {
-                    // Child 0: Collapsible Header + Wrapped Spotlight Banner
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 12.dp)
-                            .graphicsLayer {
-                                val h = headerState.heightPx
-                                val visible = (h + headerState.offsetPx).coerceAtLeast(0f)
-                                val collapseFrac = if (h > 0) (visible / h).coerceIn(0f, 1f) else 1f
-                                alpha = collapseFrac
-                                val s = 0.965f + 0.035f * collapseFrac
-                                scaleX = s
-                                scaleY = s
-                                transformOrigin = TransformOrigin(0.5f, 1f)
-                            },
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        LiquidAppHeader(
-                            studentInfo = uiState.studentInfo,
-                            isDemo = uiState.isDemo,
-                            isSyncing = isSyncing,
-                            onSync = { viewModel.syncAllData() },
-                            onLogout = onLogout
-                        )
+                    .fillMaxSize()
+                    .hazeSource(hazeState)
+                    .statusBarsPadding()
+                    .nestedScroll(headerScrollConnection)
+                    .padding(horizontal = 12.dp)
+            ) {
+                Spacer(modifier = Modifier.height(10.dp))
 
-                        WrappedSpotlightBanner(
-                            onClick = { viewModel.setWrappedModalOpen(true) }
-                        )
-                    }
-
-                    // Child 1: Sticky 4-Tab Bar synced 1:1 with HorizontalPager on GPU layer
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        SegmentedViewTabs(
-                            pagerState = pagerState,
-                            onSelectTab = { viewModel.selectTab(it) }
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                    }
-
-                    // Child 2: Constant-height HorizontalPager hosting lazy-virtualized tab screens
-                    HorizontalPager(
-                        state = pagerState,
-                        beyondViewportPageCount = 0,
-                        key = { tabs[it].name },
-                        modifier = Modifier.fillMaxSize()
-                    ) { page ->
-                Box(
+                // Fixed-height Layout: header collapse reads offsetPx ONLY during placement/graphicsLayer
+                // so HorizontalPager and all tab LazyColumns experience ZERO remeasurements while scrolling.
+                Layout(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction)
-                                .coerceIn(-1f, 1f)
-                            val absOffset = abs(pageOffset)
-                            val s = 1f - absOffset * 0.03f
-                            scaleX = s
-                            scaleY = s
-                            alpha = 1f - absOffset * 0.18f
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .clipToBounds(),
+                    content = {
+                        // Child 0: Collapsible Header
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp)
+                                .graphicsLayer {
+                                    val h = headerState.heightPx
+                                    val visible = (h + headerState.offsetPx).coerceAtLeast(0f)
+                                    val collapseFrac = if (h > 0) (visible / h).coerceIn(0f, 1f) else 1f
+                                    alpha = collapseFrac
+                                    val s = 0.965f + 0.035f * collapseFrac
+                                    scaleX = s
+                                    scaleY = s
+                                    transformOrigin = TransformOrigin(0.5f, 1f)
+                                }
+                        ) {
+                            LiquidAppHeader(
+                                studentInfo = uiState.studentInfo,
+                                isDemo = uiState.isDemo,
+                                isSyncing = isSyncing,
+                                onSync = { viewModel.syncAllData() },
+                                onLogout = onLogout
+                            )
                         }
-                ) {
-                    when (tabs[page]) {
-                    DashboardTab.CALENDAR -> {
-                        CalendarTab(
-                            uiState = uiState,
-                            onPrevMonth = { viewModel.prevMonth() },
-                            onNextMonth = { viewModel.nextMonth() },
-                            onGoToday = { viewModel.goToday() },
-                            onSelectDate = { viewModel.selectDate(it) }
-                        )
+
+                        // Child 1: Full-height HorizontalPager extending cleanly behind the floating iOS dock
+                        HorizontalPager(
+                            state = pagerState,
+                            beyondViewportPageCount = 0,
+                            key = { tabs[it].name },
+                            modifier = Modifier.fillMaxSize()
+                        ) { page ->
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer {
+                                        val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction)
+                                            .coerceIn(-1f, 1f)
+                                        val absOffset = abs(pageOffset)
+                                        val s = 1f - absOffset * 0.03f
+                                        scaleX = s
+                                        scaleY = s
+                                        alpha = 1f - absOffset * 0.18f
+                                    }
+                            ) {
+                                when (tabs[page]) {
+                                    DashboardTab.CALENDAR -> {
+                                        CalendarTab(
+                                            uiState = uiState,
+                                            onPrevMonth = { viewModel.prevMonth() },
+                                            onNextMonth = { viewModel.nextMonth() },
+                                            onGoToday = { viewModel.goToday() },
+                                            onSelectDate = { viewModel.selectDate(it) }
+                                        )
+                                    }
+
+                                    DashboardTab.SUBJECT_PLANNER -> {
+                                        SubjectPlannerTab(
+                                            uiState = uiState,
+                                            onTargetChanged = { viewModel.setTargetPercent(it) },
+                                            onSearchChanged = { viewModel.setSearchQuery(it) },
+                                            onSimulateSubject = { code, att, cond ->
+                                                viewModel.simulateSubject(code, att, cond)
+                                            },
+                                            onResetSubjectSim = { viewModel.resetSubjectSimulation(it) },
+                                            onSimScopeChanged = { viewModel.setSimScope(it) },
+                                            onAdjustSimAttend = { viewModel.adjustSimAttend(it) },
+                                            onAdjustSimBunk = { viewModel.adjustSimBunk(it) },
+                                            onApplySimPreset = { att, bunk -> viewModel.applySimPreset(att, bunk) },
+                                            onResetSimulator = { viewModel.resetSimulator() },
+                                            onOpenAbsentModal = { viewModel.openAbsentModal(it) },
+                                            onRetryFetch = { viewModel.loadAttendance() }
+                                        )
+                                    }
+
+                                    DashboardTab.ACTIVITY_MATRIX -> {
+                                        ActivityMatrixTab(
+                                            uiState = uiState,
+                                            streaks = streaks,
+                                            weeklyPattern = weeklyPattern,
+                                            monthlyTrend = monthlyTrend,
+                                            getFilteredDayStats = { dateStr, sub ->
+                                                viewModel.getFilteredDayStats(dateStr, sub)
+                                            },
+                                            onSelectSubjectFilter = { viewModel.setHeatmapSubjectFilter(it) },
+                                            onJumpToDate = { viewModel.jumpToDateInCalendar(it) }
+                                        )
+                                    }
+
+                                    DashboardTab.IA_MARKS -> {
+                                        IaMarksTab(
+                                            uiState = uiState,
+                                            onRefreshIa = { viewModel.loadIaMarks() }
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
+                ) { measurables, constraints ->
+                    val loose = constraints.copy(minWidth = 0, minHeight = 0)
+                    val headerPlaceable = measurables[0].measure(loose.copy(maxHeight = Constraints.Infinity))
+                    headerState.heightPx = headerPlaceable.height
 
-                    DashboardTab.SUBJECT_PLANNER -> {
-                        SubjectPlannerTab(
-                            uiState = uiState,
-                            onTargetChanged = { viewModel.setTargetPercent(it) },
-                            onSearchChanged = { viewModel.setSearchQuery(it) },
-                            onSimulateSubject = { code, att, cond ->
-                                viewModel.simulateSubject(code, att, cond)
-                            },
-                            onResetSubjectSim = { viewModel.resetSubjectSimulation(it) },
-                            onSimScopeChanged = { viewModel.setSimScope(it) },
-                            onAdjustSimAttend = { viewModel.adjustSimAttend(it) },
-                            onAdjustSimBunk = { viewModel.adjustSimBunk(it) },
-                            onApplySimPreset = { att, bunk -> viewModel.applySimPreset(att, bunk) },
-                            onResetSimulator = { viewModel.resetSimulator() },
-                            onOpenAbsentModal = { viewModel.openAbsentModal(it) },
-                            onRetryFetch = { viewModel.loadAttendance() }
-                        )
+                    val pagerPlaceable = measurables[1].measure(
+                        Constraints.fixed(constraints.maxWidth, constraints.maxHeight)
+                    )
+
+                    layout(constraints.maxWidth, constraints.maxHeight) {
+                        val minOffset = -headerPlaceable.height.toFloat()
+                        val offsetInt = headerState.offsetPx.coerceIn(minOffset, 0f).roundToInt()
+                        val visibleHeaderH = (headerPlaceable.height + offsetInt).coerceAtLeast(0)
+
+                        headerPlaceable.placeRelative(0, offsetInt)
+                        pagerPlaceable.placeRelative(0, visibleHeaderH)
                     }
-
-                    DashboardTab.ACTIVITY_MATRIX -> {
-                        ActivityMatrixTab(
-                            uiState = uiState,
-                            streaks = streaks,
-                            weeklyPattern = weeklyPattern,
-                            monthlyTrend = monthlyTrend,
-                            getFilteredDayStats = { dateStr, sub ->
-                                viewModel.getFilteredDayStats(dateStr, sub)
-                            },
-                            onSelectSubjectFilter = { viewModel.setHeatmapSubjectFilter(it) },
-                            onJumpToDate = { viewModel.jumpToDateInCalendar(it) }
-                        )
-                    }
-
-                    DashboardTab.IA_MARKS -> {
-                        IaMarksTab(
-                            uiState = uiState,
-                            onRefreshIa = { viewModel.loadIaMarks() }
-                        )
-                    }
-                }
-                }
-                    }
-                }
-            ) { measurables, constraints ->
-                val loose = constraints.copy(minWidth = 0, minHeight = 0)
-                val headerPlaceable = measurables[0].measure(loose.copy(maxHeight = Constraints.Infinity))
-                headerState.heightPx = headerPlaceable.height
-
-                val tabsPlaceable = measurables[1].measure(loose)
-                val pagerHeight = (constraints.maxHeight - tabsPlaceable.height).coerceAtLeast(0)
-                val pagerPlaceable = measurables[2].measure(
-                    Constraints.fixed(constraints.maxWidth, pagerHeight)
-                )
-
-                layout(constraints.maxWidth, constraints.maxHeight) {
-                    val minOffset = -headerPlaceable.height.toFloat()
-                    val offsetInt = headerState.offsetPx.coerceIn(minOffset, 0f).roundToInt()
-                    val visibleHeaderH = (headerPlaceable.height + offsetInt).coerceAtLeast(0)
-
-                    headerPlaceable.placeRelative(0, offsetInt)
-                    tabsPlaceable.placeRelative(0, visibleHeaderH)
-                    pagerPlaceable.placeRelative(0, visibleHeaderH + tabsPlaceable.height)
                 }
             }
+
+            // Subtle Apple-style bottom gradient scrim behind the floating dock
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .windowInsetsBottomHeight(WindowInsets.navigationBars.add(WindowInsets(bottom = 84.dp)))
+                    .background(BottomScrimBrush)
+            )
+
+            // Floating iOS Liquid Glass Dock (Apple Music style)
+            IosLiquidGlassDock(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                hazeState = hazeState,
+                pagerState = pagerState,
+                onSelectTab = { viewModel.selectTab(it) }
+            )
         }
 
-        // In-window Frosted Modals (RenderEffect Haze blur enabled only while visible)
-        AnimatedVisibility(
-            visible = uiState.showWrappedModal,
-            enter = fadeIn(tween(200)) + scaleIn(
-                initialScale = 0.92f,
-                animationSpec = spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessMedium)
-            ),
-            exit = fadeOut(tween(150)) + scaleOut(
-                targetScale = 0.94f,
-                animationSpec = tween(150)
-            )
-        ) {
-            AttendanceWrappedModal(
-                uiState = uiState,
-                streaks = streaks,
-                onDismiss = { viewModel.setWrappedModalOpen(false) }
-            )
-        }
-
+        // In-window Frosted Modals (RenderEffect Haze blur enabled while visible)
         AnimatedVisibility(
             visible = uiState.absentModalSubject != null,
             enter = fadeIn(tween(200)) + scaleIn(
@@ -657,87 +647,9 @@ private fun CircularHeaderActionButton(
 }
 
 @Composable
-private fun WrappedSpotlightBanner(onClick: () -> Unit) {
-    LiquidGlassCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .bouncyClickable(pressedScale = 0.98f, onClick = onClick),
-        cornerRadius = 20.dp,
-        contentPadding = PaddingValues(14.dp),
-        glassAlpha = 0.70f,
-        accentOverlayBrush = GoldSpotlightOverlay,
-        topAccentBarBrush = GoldSpotlightTopBar,
-        borderBrush = GoldSpotlightBorder
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .clip(PillShape)
-                    .background(GoldAccent.copy(alpha = 0.16f))
-                    .border(1.dp, GoldAccent.copy(alpha = 0.38f), PillShape)
-                    .padding(horizontal = 8.dp, vertical = 3.dp)
-            ) {
-                Text(
-                    text = "✨ VIRAL RECAP",
-                    fontSize = 10.sp,
-                    fontFamily = AppMonoFont,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = GoldAccent
-                )
-            }
-            Text(
-                text = "View Story →",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = Foreground.copy(alpha = 0.9f)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Row(verticalAlignment = Alignment.Top) {
-            Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(GoldAccent.copy(alpha = 0.15f))
-                    .border(1.dp, GoldAccent.copy(alpha = 0.30f), RoundedCornerShape(14.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Star,
-                    contentDescription = null,
-                    tint = GoldAccent,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Attendance Wrapped 2026",
-                    fontSize = 14.5.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = (-0.2).sp,
-                    color = Foreground
-                )
-                Spacer(modifier = Modifier.height(3.dp))
-                Text(
-                    text = "Generate your Spotify-style 9:16 recap story card for WhatsApp & Instagram",
-                    fontSize = 12.sp,
-                    color = ForegroundMuted,
-                    lineHeight = 16.sp
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SegmentedViewTabs(
+private fun IosLiquidGlassDock(
+    modifier: Modifier = Modifier,
+    hazeState: HazeState,
     pagerState: PagerState,
     onSelectTab: (DashboardTab) -> Unit
 ) {
@@ -750,20 +662,68 @@ private fun SegmentedViewTabs(
         }
     }
 
+    val dockHazeStyle = remember {
+        HazeStyle(
+            backgroundColor = Color(0xFF141418),
+            tint = HazeTint(Color(0xFF141418).copy(alpha = 0.72f)),
+            blurRadius = 26.dp,
+            noiseFactor = 0.04f
+        )
+    }
+
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
+            .widthIn(max = 460.dp)
+            .shadow(
+                elevation = 22.dp,
+                shape = PillShape,
+                ambientColor = Color.Black.copy(alpha = 0.95f),
+                spotColor = Color.Black.copy(alpha = 0.95f)
+            )
             .clip(PillShape)
-            .background(TabTrack, PillShape)
-            .border(1.dp, GlassBorderSubtle, PillShape)
-            .padding(4.dp)
+            .hazeEffect(state = hazeState, style = dockHazeStyle)
+            .drawWithCache {
+                val stroke1 = 1.dp.toPx()
+                val cr = size.height / 2f
+                val cornerRadiusObj = CornerRadius(cr, cr)
+                val outerStroke = Stroke(width = stroke1)
+                val topSheen = Brush.verticalGradient(
+                    0f to Color.White.copy(alpha = 0.11f),
+                    0.45f to Color.Transparent
+                )
+                val topSpecularRim = Brush.horizontalGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        Color.White.copy(alpha = 0.34f),
+                        Color.White.copy(alpha = 0.34f),
+                        Color.Transparent
+                    )
+                )
+                onDrawWithContent {
+                    drawRect(brush = topSheen)
+                    drawContent()
+                    drawLine(
+                        brush = topSpecularRim,
+                        start = Offset(cr * 0.4f, stroke1),
+                        end = Offset(size.width - cr * 0.4f, stroke1),
+                        strokeWidth = stroke1
+                    )
+                    drawRoundRect(
+                        brush = DockBorderBrush,
+                        cornerRadius = cornerRadiusObj,
+                        style = outerStroke
+                    )
+                }
+            }
+            .padding(5.dp)
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(36.dp)
+                .height(54.dp)
         ) {
-            // Smooth GPU-gliding Liquid Glass highlighter pill (0 recompositions during swipe/glide)
+            // Smooth GPU-gliding Apple Liquid Glass highlighter pill (0 recompositions during swipe/glide)
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
@@ -780,7 +740,7 @@ private fun SegmentedViewTabs(
                                     .coerceIn(0f, (tabs.size - 1).toFloat())
                                 val stretch = sin(abs(pagerState.currentPageOffsetFraction).coerceIn(0f, 1f) * PI.toFloat())
                                 translationX = progress * (tabW + spacingPx)
-                                scaleX = 1f + stretch * 0.11f
+                                scaleX = 1f + stretch * 0.10f
                                 scaleY = 1f - stretch * 0.045f
                             }
                         }
@@ -790,7 +750,7 @@ private fun SegmentedViewTabs(
                     .border(1.dp, ActiveTabBorderBrush, PillShape)
             )
 
-            // Foreground Tab Buttons
+            // Foreground Apple Music-style stacked Icon + Label tab items
             Row(
                 modifier = Modifier.fillMaxSize(),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -800,12 +760,12 @@ private fun SegmentedViewTabs(
                     val contentColor by animateColorAsState(
                         targetValue = if (isSelected) Foreground else ForegroundMuted,
                         animationSpec = tween(180),
-                        label = "tabTextColor"
+                        label = "dockTextColor"
                     )
                     val iconScale by animateFloatAsState(
                         targetValue = if (isSelected) 1.08f else 0.96f,
                         animationSpec = spring(dampingRatio = 0.68f, stiffness = Spring.StiffnessMedium),
-                        label = "tabIconScale"
+                        label = "dockIconScale"
                     )
                     val icon = when (tab) {
                         DashboardTab.CALENDAR -> Icons.Default.DateRange
@@ -820,7 +780,7 @@ private fun SegmentedViewTabs(
                         DashboardTab.IA_MARKS -> "IA Marks"
                     }
 
-                    Row(
+                    Column(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
@@ -830,25 +790,25 @@ private fun SegmentedViewTabs(
                                 indication = null
                             ) { onSelectTab(tab) }
                             .padding(horizontal = 4.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
                     ) {
                         Icon(
                             imageVector = icon,
                             contentDescription = tab.title,
                             tint = contentColor,
                             modifier = Modifier
-                                .size(13.5.dp)
+                                .size(19.dp)
                                 .graphicsLayer {
                                     scaleX = iconScale
                                     scaleY = iconScale
                                 }
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = shortTitle,
-                            fontSize = 11.5.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                            fontSize = 10.5.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                             color = contentColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis

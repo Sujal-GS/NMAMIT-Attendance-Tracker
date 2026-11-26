@@ -66,9 +66,10 @@ fun IaMarksTab(
 ) {
     val marks = uiState.iaMarks
 
+    val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 24.dp),
+        contentPadding = PaddingValues(bottom = navBottom + 92.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item(key = "ia_hero", contentType = "ia_hero") {

@@ -119,9 +119,10 @@ fun CalendarTab(
         label = "calRate"
     )
 
+    val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 24.dp),
+        contentPadding = PaddingValues(bottom = navBottom + 92.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // 1. Month Calendar Liquid Card

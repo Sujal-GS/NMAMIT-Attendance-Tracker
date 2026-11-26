@@ -86,7 +86,6 @@ data class DashboardUiState(
     val iaError: String? = null,
 
     // Modals
-    val showWrappedModal: Boolean = false,
     val absentModalSubject: SubjectAttendanceDto? = null,
     val absentModalRecords: List<AbsentRecordItem> = emptyList()
 )
@@ -452,12 +451,8 @@ class DashboardViewModel(
     }
 
     // -----------------------------------------------------------------------
-    // Modals: Wrapped & Absent Dates
+    // Modals: Absent Dates
     // -----------------------------------------------------------------------
-    fun setWrappedModalOpen(open: Boolean) {
-        _uiState.value = _uiState.value.copy(showWrappedModal = open)
-    }
-
     fun openAbsentModal(subject: SubjectAttendanceDto) {
         val cleanTarget = subject.subCode.replace(Regex("[^a-zA-Z0-9]"), "").lowercase()
         val allDays = mutableMapOf<String, DayAttendanceSummary>()
@@ -500,7 +495,7 @@ class DashboardViewModel(
     }
 
     // -----------------------------------------------------------------------
-    // Computed Helpers for Heatmap / Insights / Wrapped
+    // Computed Helpers for Heatmap / Insights
     // -----------------------------------------------------------------------
     fun getFilteredDayStats(dateStr: String, filterSubCode: String): Pair<Int, Int> {
         return getFilteredDayStatsFromData(_uiState.value.semesterData, dateStr, filterSubCode)
