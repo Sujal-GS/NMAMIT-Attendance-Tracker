@@ -4,16 +4,23 @@ const path = require('path');
 const crypto = require('crypto');
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3050;
 const PORTAL_BASE = 'https://studentportal.universitysolutions.in';
 
 // -----------------------------------------------------------------------------
 // 1. Production Secrets & Stateless Session Encryption (AES-256-GCM)
 // -----------------------------------------------------------------------------
-if (!process.env.SESSION_SECRET && process.env.NODE_ENV === 'production') {
-  console.warn('⚠️ [SECURITY WARNING] SESSION_SECRET is not set in production. Using fallback secret.');
+let SESSION_SECRET = process.env.SESSION_SECRET;
+if (!SESSION_SECRET) {
+  if (process.env.NODE_ENV === 'production') {
+    // In production, generate an ephemeral cryptographically strong key if none provided
+    SESSION_SECRET = crypto.randomBytes(32).toString('hex');
+    console.warn('⚠️ [SECURITY WARNING] SESSION_SECRET environment variable is missing in production. Generated ephemeral random secret for this runtime instance.');
+  } else {
+    SESSION_SECRET = 'nmamit_attendance_secret_dev_2026_x9k2p_nitte';
+  }
 }
-const SESSION_SECRET = process.env.SESSION_SECRET || 'nmamit_attendance_secret_key_2026_x9k2p_nitte';
 const ENCRYPTION_KEY = crypto.createHash('sha256').update(SESSION_SECRET).digest();
 const ALGORITHM = 'aes-256-gcm';
 
@@ -191,9 +198,21 @@ function checkRateLimit(key, maxRequests, windowMs) {
   return true;
 }
 
+function getClientIp(req) {
+  if (req.ip) return req.ip;
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.length > 0) {
+    const candidate = forwarded.split(',')[0].trim();
+    if (/^[a-fA-F0-9:.]+$/.test(candidate)) {
+      return candidate;
+    }
+  }
+  return req.socket.remoteAddress || '127.0.0.1';
+}
+
 // Login rate limiting (15 attempts / 15 min per IP)
 function loginRateLimitMiddleware(req, res, next) {
-  const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+  const ip = getClientIp(req);
   if (!checkRateLimit(`login_${ip}`, 15, 15 * 60 * 1000)) {
     return res.status(429).json({
       success: false,
@@ -205,7 +224,7 @@ function loginRateLimitMiddleware(req, res, next) {
 
 // Captcha rate limiting (30 attempts / 5 min per IP)
 function captchaRateLimitMiddleware(req, res, next) {
-  const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+  const ip = getClientIp(req);
   if (!checkRateLimit(`captcha_${ip}`, 30, 5 * 60 * 1000)) {
     return res.status(429).json({
       success: false,
@@ -217,7 +236,7 @@ function captchaRateLimitMiddleware(req, res, next) {
 
 // General API rate limiting (120 requests / 1 min per IP)
 app.use('/api/', (req, res, next) => {
-  const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+  const ip = getClientIp(req);
   if (!checkRateLimit(`api_${ip}`, 120, 60 * 1000)) {
     return res.status(429).json({
       success: false,
@@ -1320,6 +1339,16 @@ app.post('/api/logout', (req, res) => {
 // Catch-all: serve index.html for SPA
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Centralized Security Error Handler (Never leak stack traces to client)
+app.use((err, req, res, next) => {
+  console.error('[Unhandled Server Error]:', err && err.message ? err.message : err);
+  if (res.headersSent) return next(err);
+  res.status(err.status || 500).json({
+    success: false,
+    message: 'An internal server security or processing error occurred.'
+  });
 });
 
 if (require.main === module) {

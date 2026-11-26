@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">NMAMIT Attendance</string>
+    <string name="login_title">Student Portal Login</string>
+    <string name="login_subtitle">Sign in with your University Solutions USN</string>
+    <string name="regno_hint">University Seat Number (USN / Reg No)</string>
+    <string name="password_hint">Portal Password</string>
+    <string name="captcha_hint">Enter Captcha</string>
+    <string name="login_button">Sign In</string>
+    <string name="demo_button">Try Demo Mode</string>
+    <string name="dashboard_title">Attendance Dashboard</string>
+    <string name="what_if_title">What-If Simulator</string>
+</resources>
