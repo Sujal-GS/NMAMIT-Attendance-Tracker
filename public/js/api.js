@@ -90,16 +90,21 @@ const API = {
           window.HeatmapView.semesterData.clear();
         }
 
-        if (window.App && typeof window.App.showAuth === 'function') {
-          window.App.showAuth();
-          if (typeof window.App.showToast === 'function') {
-            window.App.showToast('University portal session expired. Please sign in again to load live data.', 'error');
-          }
-          if (typeof window.App.refreshCaptcha === 'function') {
-            window.App.refreshCaptcha();
+        // Debounce session expiration notification to prevent stacked duplicate toasts
+        const now = Date.now();
+        if (!window._lastSessionExpiredToast || now - window._lastSessionExpiredToast > 4000) {
+          window._lastSessionExpiredToast = now;
+          if (window.App && typeof window.App.showAuth === 'function') {
+            window.App.showAuth();
+            if (typeof window.App.showToast === 'function') {
+              window.App.showToast('University portal session expired. Please sign in again to load live data.', 'error');
+            }
+            if (typeof window.App.refreshCaptcha === 'function') {
+              window.App.refreshCaptcha();
+            }
           }
         }
-        throw new Error(data.message || 'University portal session expired. Please log in again.');
+        throw new Error((data && data.message) || 'University portal session expired. Please log in again.');
       }
 
       if (!resp.ok) {

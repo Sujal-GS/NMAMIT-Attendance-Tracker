@@ -11,22 +11,14 @@ const PORTAL_BASE = 'https://studentportal.universitysolutions.in';
 // -----------------------------------------------------------------------------
 // 1. Production Secrets & Stateless Session Encryption (AES-256-GCM)
 // -----------------------------------------------------------------------------
-let SESSION_SECRET = process.env.SESSION_SECRET;
-if (!SESSION_SECRET) {
-  if (process.env.NODE_ENV === 'production') {
-    // In production, generate an ephemeral cryptographically strong key if none provided
-    SESSION_SECRET = crypto.randomBytes(32).toString('hex');
-    console.warn('⚠️ [SECURITY WARNING] SESSION_SECRET environment variable is missing in production. Generated ephemeral random secret for this runtime instance.');
-  } else {
-    SESSION_SECRET = 'nmamit_attendance_secret_dev_2026_x9k2p_nitte';
-  }
-}
+// Uses configured SESSION_SECRET, or a deterministic stable key across all Vercel serverless Lambdas
+const SESSION_SECRET = process.env.SESSION_SECRET || 'nmamit_attendance_stateless_secret_key_2026_x9k2p_nitte_auth';
 const ENCRYPTION_KEY = crypto.createHash('sha256').update(SESSION_SECRET).digest();
 const ALGORITHM = 'aes-256-gcm';
 
 // Token lifetimes
-const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days max lifetime
-const CAPTCHA_MAX_AGE_MS = 15 * 60 * 1000;           // 15 minutes max lifetime
+const SESSION_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000; // 14 days max lifetime
+const CAPTCHA_MAX_AGE_MS = 30 * 60 * 1000;           // 30 minutes max lifetime
 
 function encryptPayload(prefix, payload) {
   try {
@@ -52,7 +44,9 @@ function decryptPayload(prefix, token, maxAgeMs = null) {
     const tokenPrefix = `${prefix}_`;
     if (!token.startsWith(tokenPrefix)) return null;
     const raw = token.slice(tokenPrefix.length);
-    const [ivB64, authTagB64, encrypted] = raw.split('.');
+    // Sanitize in case URL query params decoded '+' to ' '
+    const cleanRaw = raw.replace(/ /g, '+');
+    const [ivB64, authTagB64, encrypted] = cleanRaw.split('.');
     if (!ivB64 || !authTagB64 || !encrypted) return null;
 
     const iv = Buffer.from(ivB64, 'base64');
@@ -662,7 +656,13 @@ app.post('/api/login', loginRateLimitMiddleware, async (req, res) => {
       cookies: sessionObj.cookies,
       regno: sessionObj.regno,
       univcode: sessionObj.univcode,
-      studentInfo: sessionObj.studentInfo,
+      studentInfo: sessionObj.studentInfo ? {
+        fregno: sessionObj.studentInfo.fregno,
+        fname: sessionObj.studentInfo.fname,
+        fdegree: sessionObj.studentInfo.fdegree,
+        fdescpn: sessionObj.studentInfo.fdescpn,
+        fexamname: sessionObj.studentInfo.fexamname
+      } : null,
       isDemo: false,
       createdAt: Date.now()
     };
@@ -694,7 +694,6 @@ function isPortalSessionExpired(data, rawText = '') {
       lower.includes('please login') ||
       lower.includes('invalid session') ||
       lower.includes('not logged in') ||
-      lower.includes('signin.php') ||
       lower.includes('window.location="index.html"') ||
       lower.includes('window.location=\'index.html\'')
     ) {
